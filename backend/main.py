@@ -1,9 +1,12 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import shutil
 import os
 from pathlib import Path
-from audio_processor import extract_audio, separate_vocals
+
+from services import process_video_background, perform_transcription, get_upload_dir
+from schemas import TranscribeRequest
 
 app = FastAPI()
 
@@ -21,31 +24,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR = get_upload_dir()
 
-def process_video(video_path: Path):
-    print(f"Starting processing for: {video_path}")
-    
-    # 1. Extract Audio
-    audio_path = video_path.with_suffix(".mp3")
-    print(f"Extracting audio to: {audio_path}")
-    if extract_audio(video_path, audio_path):
-        print("Audio extraction successful")
-        
-        # 2. Separate Vocals
-        print("Starting vocal separation...")
-        # Output directory for separated tracks
-        separation_out_dir = UPLOAD_DIR / "separated"
-        separation_out_dir.mkdir(exist_ok=True)
-        
-        vocals_path = separate_vocals(audio_path, separation_out_dir)
-        if vocals_path:
-             print(f"Vocal separation successful: {vocals_path}")
-        else:
-             print("Vocal separation failed")
-    else:
-        print("Audio extraction failed")
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 @app.get("/")
 def read_root():
@@ -54,16 +35,32 @@ def read_root():
 @app.post("/upload")
 async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
     if not file.content_type.startswith("video/"):
-        raise HTTPException(status_code=400, detail="Invalid file type. Please upload a video file.")
+        raise HTTPException(status_code=400, detail="無効なファイル形式です。動画ファイルをアップロードしてください。")
     
     file_path = UPLOAD_DIR / file.filename
     try:
         with file_path.open("wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not save file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"ファイルの保存に失敗しました: {str(e)}")
     
     # Schedule background processing
-    background_tasks.add_task(process_video, file_path)
+    background_tasks.add_task(process_video_background, file_path)
         
-    return {"filename": file.filename, "filepath": str(file_path), "message": "Upload successful. Processing started in background."}
+    return {"filename": file.filename, "filepath": str(file_path), "message": "アップロードが完了しました。バックグラウンドで処理を開始します。"}
+
+@app.post("/transcribe")
+def transcribe_endpoint(request: TranscribeRequest):
+    result = perform_transcription(request.filename)
+    
+    if result is None:
+        # result is None can mean file not found or transcription error.
+        # Ideally services should raise exceptions or return result codes.
+        # For now assuming generic failure if None, but we should check if file exists in services logic.
+        # Actually perform_transcription returns None if file not found OR transcription error (though transcribe_audio returns None on error).
+        # Let's verify file existence in main or assume 500/404 based on service.
+        # Simpler: Main relies on service. Service returns None -> Error.
+        raise HTTPException(status_code=500, detail="文字起こしに失敗しました（ファイルが見つからないか、処理エラー）")
+        
+    return {"text": result["text"], "segments": result["segments"]}
+

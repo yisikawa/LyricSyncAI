@@ -24,6 +24,34 @@ from demucs.pretrained import get_model
 from demucs.apply import apply_model
 from demucs.audio import AudioFile
 import soundfile as sf
+import whisper
+
+def transcribe_audio(audio_path: Path):
+    """
+    Transcribe audio using OpenAI Whisper.
+    """
+    try:
+        print(f"Loading Whisper model...")
+        model = whisper.load_model("medium")
+        print(f"Transcribing audio: {audio_path}")
+        # 日本語文字起こしの精度向上のためのパラメータ設定
+        # initial_prompt: 文脈を与えてハルシネーションを防ぐ
+        # beam_size, best_of: 探索の幅を広げて精度を上げる
+        # temperature: 0に近いほど決定的な出力になる
+        result = model.transcribe(
+            str(audio_path),
+            language="ja",
+            verbose=True,
+            initial_prompt="歌詞",
+            beam_size=5,
+            best_of=5,
+            temperature=0.0,
+            condition_on_previous_text=False
+        )
+        return result
+    except Exception as e:
+        print(f"Error transcribing audio: {e}")
+        return None
 
 def extract_audio(video_path: Path, output_path: Path):
     """
