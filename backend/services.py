@@ -1,11 +1,10 @@
 from pathlib import Path
 from audio_processor import extract_audio, separate_vocals, transcribe_audio, create_srt, burn_subtitles
-
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+from config import UPLOAD_DIR, SEPARATED_DIR
 
 def get_upload_dir() -> Path:
     return UPLOAD_DIR
+
 
 def process_video_background(video_path: Path):
     """
@@ -22,8 +21,7 @@ def process_video_background(video_path: Path):
         # 2. Separate Vocals
         print("Starting vocal separation...")
         # Output directory for separated tracks
-        separation_out_dir = UPLOAD_DIR / "separated"
-        separation_out_dir.mkdir(exist_ok=True)
+        separation_out_dir = SEPARATED_DIR
         
         vocals_path = separate_vocals(audio_path, separation_out_dir)
         if vocals_path:
@@ -35,18 +33,34 @@ def process_video_background(video_path: Path):
 
 def perform_transcription(filename: str):
     """
-    Perform transcription on the defined file.
-    Handles path logic regarding vocals.wav vs other files.
+    Perform transcription. Prioritize separated vocals if available.
     """
-    if filename == "vocals.wav":
-        target_path = UPLOAD_DIR / "separated" / filename
+    # 1. Check for separated vocals first
+    video_path = UPLOAD_DIR / filename
+    vocals_path = SEPARATED_DIR / f"{video_path.stem}_vocals.wav"
+    audio_path = UPLOAD_DIR / video_path.with_suffix(".mp3").name
+    
+    print(f"--- Transcription Request ---")
+    print(f"Target Video: {filename}")
+    print(f"Looking for Vocals: {vocals_path}")
+    print(f"Looking for Audio: {audio_path}")
+    
+    if vocals_path.exists():
+        print(f"--- OK: Using separated vocals: {vocals_path}")
+        target_path = vocals_path
+    elif audio_path.exists():
+        print(f"--- OK: Using extracted audio: {audio_path}")
+        target_path = audio_path
+    elif video_path.exists():
+        print(f"--- OK: Using original video file: {video_path}")
+        target_path = video_path
     else:
-        target_path = UPLOAD_DIR / filename
-        
-    if not target_path.exists():
-         return None
+        print(f"--- ERROR: No audio source found for {filename}")
+        return None
          
     return transcribe_audio(target_path)
+
+
 
 def export_video_with_subtitles(video_filename: str, segments: list):
     """

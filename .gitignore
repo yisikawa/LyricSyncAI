@@ -52,3 +52,6 @@ backend/.venv
 # Frontend specific
 frontend/node_modules/
 frontend/dist/
+
+# Application uploads
+backend/uploads/

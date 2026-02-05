@@ -1,22 +1,31 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { LyricEditor } from './components/LyricEditor';
 import { VideoPlayer } from './components/VideoPlayer';
-import type { UploadResult, Segment } from './types';
+import { useLyricsProcessor } from './hooks/useLyricsProcessor';
+import type { UploadResult } from './types';
 
 function App() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
-  const [segments, setSegments] = useState<Segment[]>([]);
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef<HTMLVideoElement>(null);
 
-  const handleTimeUpdate = () => {
+  const {
+    segments,
+    setSegments,
+    isTranscribing,
+    isExporting,
+    handleTranscribe,
+    handleExport,
+    resetSegments
+  } = useLyricsProcessor(uploadResult);
+
+
+  const handleTimeUpdate = useCallback(() => {
     if (audioRef.current) {
       setCurrentTime(audioRef.current.currentTime);
     }
-  };
+  }, []);
 
   const handleSeek = (time: number) => {
     if (audioRef.current) {
@@ -25,83 +34,17 @@ function App() {
     }
   };
 
-  const handleExport = async () => {
-    if (!uploadResult) return;
-    setIsExporting(true);
-    try {
-      const response = await fetch('http://localhost:8001/export', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          video_filename: uploadResult.filename,
-          segments: segments,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Export failed');
-      }
-
-      const data = await response.json();
-      // Download the file
-      const link = document.createElement('a');
-      link.href = data.url;
-      link.download = data.filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      alert('動画の書き出しが完了しました。');
-    } catch (error) {
-      console.error('Export error:', error);
-      alert('動画の書き出しに失敗しました');
-    } finally {
-      setIsExporting(false);
-    }
-  };
-
-  const handleTranscribe = async () => {
-    setIsTranscribing(true);
-    try {
-      const response = await fetch('http://localhost:8001/transcribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ filename: 'vocals.wav' }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Transcription failed');
-      }
-
-      const data = await response.json();
-      // Add IDs to segments if not present
-      const processedSegments = data.segments.map((seg: any, index: number) => ({
-        id: seg.id ?? index, // Use index if id is missing
-        start: seg.start,
-        end: seg.end,
-        text: seg.text
-      }));
-      setSegments(processedSegments);
-    } catch (error) {
-      console.error('Transcription error:', error);
-      alert('文字起こしに失敗しました');
-    } finally {
-      setIsTranscribing(false);
-    }
-  };
 
   const handleUploadComplete = (data: UploadResult) => {
-    console.log('Upload complete:', data);
     setUploadResult(data);
+    resetSegments();
   };
 
   const handleReset = () => {
     setUploadResult(null);
-    setSegments([]);
+    resetSegments();
   };
+
 
   return (
     <div className="min-h-screen w-full bg-gray-950 text-white flex flex-col">
@@ -136,6 +79,7 @@ function App() {
               onExport={handleExport}
               onReset={handleReset}
             />
+
 
             {/* Editor Area (Bottom) */}
             <div className="w-full flex flex-col bg-gray-900/30 border border-gray-700 rounded-xl overflow-hidden shadow-2xl min-h-[500px]">

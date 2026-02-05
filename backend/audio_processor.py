@@ -1,22 +1,31 @@
+from config import UPLOAD_DIR, WHISPER_MODEL_NAME, DEMUCS_MODEL_NAME, setup_ffmpeg
 import sys
 import os
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
-# Ensure ffmpeg path via imageio_ffmpeg if available
-try:
-    import imageio_ffmpeg
-    ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-    ffmpeg_dir = str(Path(ffmpeg_path).parent)
-    os.environ["PATH"] += os.pathsep + ffmpeg_dir
-    print(f"Added ffmpeg to PATH: {ffmpeg_dir}")
-except ImportError:
-    print("imageio-ffmpeg not found, assuming ffmpeg is in PATH")
+import torch
+import torchaudio
+import whisper
+import soundfile as sf
+from demucs.pretrained import get_model
+from demucs.apply import apply_model
+from demucs.audio import AudioFile
+
+# Initialize FFmpeg on module load
+setup_ffmpeg()
+
+
 
 try:
-    from moviepy import VideoFileClip
+    from moviepy.video.io.VideoFileClip import VideoFileClip
+    from moviepy.audio.io.AudioFileClip import AudioFileClip
 except ImportError:
-    from moviepy.editor import VideoFileClip
+    try:
+        from moviepy.editor import VideoFileClip, AudioFileClip
+    except ImportError:
+        from moviepy import VideoFileClip, AudioFileClip
+
 
 import torch
 import torchaudio
@@ -69,14 +78,16 @@ def burn_subtitles(video_path: Path, srt_path: Path, output_path: Path):
         # Especially on Windows where paths contain ":" and "\"
         # FFmpeg filter paths need careful escaping.
         # subtitles='C\:/path/to/sub.srt' or similar
-        srt_abs_path = str(srt_path.absolute()).replace("\\", "/").replace(":", "\\:")
+        # Use forward slashes for Windows paths in FFmpeg filters
+        srt_abs_path = str(srt_path.absolute()).replace("\\", "/")
         
         print(f"Burning subtitles from {srt_path} into {video_path}")
         
-        # Add subtitles filter
+        # Add subtitles filter - using filename keyword helps with Windows path escaping in ffmpeg-python
         stream = ffmpeg.input(str(video_path))
         audio = stream.audio
-        video = stream.video.filter("subtitles", srt_abs_path)
+        video = stream.video.filter("subtitles", filename=srt_abs_path)
+
         
         # Output with high quality
         out = ffmpeg.output(video, audio, str(output_path), vcodec='libx264', acodec='copy', crf=23)
@@ -98,24 +109,24 @@ def transcribe_audio(audio_path: Path):
     Transcribe audio using OpenAI Whisper.
     """
     try:
-        print(f"Loading Whisper model...")
-        model = whisper.load_model("medium")
-        print(f"Transcribing audio: {audio_path}")
-        # 日本語文字起こしの精度向上のためのパラメータ設定
-        # initial_prompt: 文脈を与えてハルシネーションを防ぐ
-        # beam_size, best_of: 探索の幅を広げて精度を上げる
-        # temperature: 0に近いほど決定的な出力になる
+        model = whisper.load_model(WHISPER_MODEL_NAME)
+
+
         result = model.transcribe(
             str(audio_path),
             language="ja",
             verbose=True,
-            initial_prompt="歌詞",
+            fp16=False,
             beam_size=5,
             best_of=5,
             temperature=0.0,
-            condition_on_previous_text=False
+            condition_on_previous_text=True
         )
+
+
+        print(f"Transcription complete: {len(result.get('segments', []))} segments found.")
         return result
+
     except Exception as e:
         print(f"Error transcribing audio: {e}")
         return None
@@ -139,19 +150,31 @@ def separate_vocals(audio_path: Path, output_dir: Path):
     Uses AudioFile (ffmpeg) for loading and soundfile for saving.
     """
     try:
-        print(f"Loading Demucs model...")
-        model = get_model('htdemucs')
+        print(f"Loading Demucs model ({DEMUCS_MODEL_NAME})...")
+        model = get_model(DEMUCS_MODEL_NAME)
+
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model.to(device)
 
-        print(f"Loading audio: {audio_path}")
-        # Use Demucs AudioFile which wraps ffmpeg
-        # This bypasses torchaudio.load specific backend issues
-        wav = AudioFile(audio_path).read(
-            streams=0,
-            samplerate=model.samplerate,
-            channels=model.audio_channels
-        )
+        try:
+            print(f"Attempting to load audio with Demucs AudioFile: {audio_path}")
+            # Use Demucs AudioFile which wraps ffmpeg
+            wav = AudioFile(audio_path).read(
+                streams=0,
+                samplerate=model.samplerate,
+                channels=model.audio_channels
+            )
+        except Exception as e:
+            print(f"Demucs AudioFile failed: {e}. Falling back to moviepy...")
+            audio = AudioFileClip(str(audio_path))
+
+            # Load as numpy and convert to torch
+            audio_data = audio.to_soundarray(fps=model.samplerate)
+            # MoviePy returns [Time, Channels], Demucs wants [Channels, Time]
+            wav = torch.from_numpy(audio_data.T).float()
+            audio.close()
+
+
         
         print("Starting separation...")
         # Add batch dimension: [1, Channels, Time]
@@ -220,8 +243,9 @@ def separate_vocals(audio_path: Path, output_dir: Path):
         vocals_np = vocals.cpu().numpy().T
         no_vocals_np = no_vocals.cpu().numpy().T
         
-        vocals_path = output_dir / "vocals.wav"
-        no_vocals_path = output_dir / "no_vocals.wav"
+        filename_stem = audio_path.stem
+        vocals_path = output_dir / f"{filename_stem}_vocals.wav"
+        no_vocals_path = output_dir / f"{filename_stem}_no_vocals.wav"
         
         print(f"Saving to {vocals_path}")
         sf.write(str(vocals_path), vocals_np, model.samplerate)
@@ -230,6 +254,7 @@ def separate_vocals(audio_path: Path, output_dir: Path):
         sf.write(str(no_vocals_path), no_vocals_np, model.samplerate)
         
         return str(vocals_path)
+
 
     except Exception as e:
         print(f"Error separating vocals: {e}")

@@ -61,7 +61,13 @@ def transcribe_endpoint(request: TranscribeRequest):
         # Simpler: Main relies on service. Service returns None -> Error.
         raise HTTPException(status_code=500, detail="文字起こしに失敗しました（ファイルが見つからないか、処理エラー）")
         
+    if result:
+        print(f"Transcription result: {len(result.get('segments', []))} segments found.")
+        if result.get("segments"):
+            print(f"First segment: {result['segments'][0].get('text')}")
+
     return {"text": result["text"], "segments": result["segments"]}
+
 
 @app.post("/export")
 def export_endpoint(request: ExportRequest):
