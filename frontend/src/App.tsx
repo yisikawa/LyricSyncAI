@@ -8,6 +8,7 @@ function App() {
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const audioRef = useRef<HTMLVideoElement>(null);
 
@@ -24,10 +25,46 @@ function App() {
     }
   };
 
+  const handleExport = async () => {
+    if (!uploadResult) return;
+    setIsExporting(true);
+    try {
+      const response = await fetch('http://localhost:8001/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          video_filename: uploadResult.filename,
+          segments: segments,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+
+      const data = await response.json();
+      // Download the file
+      const link = document.createElement('a');
+      link.href = data.url;
+      link.download = data.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      alert('動画の書き出しが完了しました。');
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('動画の書き出しに失敗しました');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const handleTranscribe = async () => {
     setIsTranscribing(true);
     try {
-      const response = await fetch('http://localhost:8000/transcribe', {
+      const response = await fetch('http://localhost:8001/transcribe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -93,8 +130,10 @@ function App() {
               currentTime={currentTime}
               videoRef={audioRef}
               isTranscribing={isTranscribing}
+              isExporting={isExporting}
               onTimeUpdate={handleTimeUpdate}
               onTranscribe={handleTranscribe}
+              onExport={handleExport}
               onReset={handleReset}
             />
 

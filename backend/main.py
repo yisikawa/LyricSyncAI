@@ -5,8 +5,8 @@ import shutil
 import os
 from pathlib import Path
 
-from services import process_video_background, perform_transcription, get_upload_dir
-from schemas import TranscribeRequest
+from services import process_video_background, perform_transcription, get_upload_dir, export_video_with_subtitles
+from schemas import TranscribeRequest, ExportRequest
 
 app = FastAPI()
 
@@ -58,9 +58,19 @@ def transcribe_endpoint(request: TranscribeRequest):
         # Ideally services should raise exceptions or return result codes.
         # For now assuming generic failure if None, but we should check if file exists in services logic.
         # Actually perform_transcription returns None if file not found OR transcription error (though transcribe_audio returns None on error).
-        # Let's verify file existence in main or assume 500/404 based on service.
         # Simpler: Main relies on service. Service returns None -> Error.
         raise HTTPException(status_code=500, detail="文字起こしに失敗しました（ファイルが見つからないか、処理エラー）")
         
     return {"text": result["text"], "segments": result["segments"]}
 
+@app.post("/export")
+def export_endpoint(request: ExportRequest):
+    output_filename = export_video_with_subtitles(request.video_filename, request.segments)
+    
+    if output_filename is None:
+        raise HTTPException(status_code=500, detail="動画の書き出しに失敗しました")
+        
+    return {
+        "filename": output_filename,
+        "url": f"http://localhost:8001/uploads/{output_filename}"
+    }

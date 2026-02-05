@@ -26,6 +26,73 @@ from demucs.audio import AudioFile
 import soundfile as sf
 import whisper
 
+def format_timestamp(seconds: float) -> str:
+    """
+    Format seconds into SRT timestamp format: HH:MM:SS,mmm
+    """
+    ms = int((seconds - int(seconds)) * 1000)
+    full_seconds = int(seconds)
+    hours = full_seconds // 3600
+    minutes = (full_seconds % 3600) // 60
+    seconds_rem = full_seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{seconds_rem:02d},{ms:03d}"
+
+def create_srt(segments: list, output_path: Path):
+    """
+    Create an SRT file from segments list.
+    """
+    try:
+        with open(output_path, "w", encoding="utf-8") as f:
+            for i, seg in enumerate(segments):
+                # Using 1-based index for SRT
+                f.write(f"{i + 1}\n")
+                # seg might be a dict (from Whisper) or an object (from Pydantic)
+                start = seg["start"] if isinstance(seg, dict) else seg.start
+                end = seg["end"] if isinstance(seg, dict) else seg.end
+                text = seg["text"].strip() if isinstance(seg, dict) else seg.text.strip()
+                
+                f.write(f"{format_timestamp(start)} --> {format_timestamp(end)}\n")
+                f.write(f"{text}\n\n")
+        return True
+    except Exception as e:
+        print(f"Error creating SRT: {e}")
+        return False
+
+def burn_subtitles(video_path: Path, srt_path: Path, output_path: Path):
+    """
+    Burn subtitles into video using FFmpeg.
+    """
+    try:
+        import ffmpeg
+        
+        # We need to escape the SRT path for FFmpeg subtitles filter
+        # Especially on Windows where paths contain ":" and "\"
+        # FFmpeg filter paths need careful escaping.
+        # subtitles='C\:/path/to/sub.srt' or similar
+        srt_abs_path = str(srt_path.absolute()).replace("\\", "/").replace(":", "\\:")
+        
+        print(f"Burning subtitles from {srt_path} into {video_path}")
+        
+        # Add subtitles filter
+        stream = ffmpeg.input(str(video_path))
+        audio = stream.audio
+        video = stream.video.filter("subtitles", srt_abs_path)
+        
+        # Output with high quality
+        out = ffmpeg.output(video, audio, str(output_path), vcodec='libx264', acodec='copy', crf=23)
+        
+        # Run FFmpeg
+        # overwrite_output=True corresponds to -y
+        out.run(overwrite_output=True, capture_stdout=True, capture_stderr=True)
+        
+        print(f"Burned video saved to: {output_path}")
+        return True
+    except Exception as e:
+        if hasattr(e, 'stderr'):
+            print(f"FFmpeg error: {e.stderr.decode()}")
+        print(f"Error burning subtitles: {e}")
+        return False
+
 def transcribe_audio(audio_path: Path):
     """
     Transcribe audio using OpenAI Whisper.

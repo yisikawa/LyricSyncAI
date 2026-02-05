@@ -1,5 +1,5 @@
 from pathlib import Path
-from audio_processor import extract_audio, separate_vocals, transcribe_audio
+from audio_processor import extract_audio, separate_vocals, transcribe_audio, create_srt, burn_subtitles
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -47,3 +47,25 @@ def perform_transcription(filename: str):
          return None
          
     return transcribe_audio(target_path)
+
+def export_video_with_subtitles(video_filename: str, segments: list):
+    """
+    Export video with burned subtitles based on provided segments.
+    """
+    video_path = UPLOAD_DIR / video_filename
+    if not video_path.exists():
+        return None
+        
+    # 1. Create SRT file
+    srt_path = video_path.with_suffix(".srt")
+    if not create_srt(segments, srt_path):
+        return None
+        
+    # 2. Burn subtitles
+    output_filename = f"exported_{video_filename}"
+    output_path = UPLOAD_DIR / output_filename
+    
+    if burn_subtitles(video_path, srt_path, output_path):
+        return output_filename
+    
+    return None
