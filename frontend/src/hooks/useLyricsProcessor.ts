@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { UploadResult, Segment } from '../types';
+import { api } from '../services/api';
 
 export const useLyricsProcessor = (uploadResult: UploadResult | null) => {
     const [segments, setSegments] = useState<Segment[]>([]);
@@ -9,27 +10,13 @@ export const useLyricsProcessor = (uploadResult: UploadResult | null) => {
     const handleTranscribe = async () => {
         if (!uploadResult) return;
         setIsTranscribing(true);
+        setSegments([]);
+
         try {
-            const response = await fetch('http://localhost:8001/transcribe', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ filename: uploadResult.filename }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Transcription failed');
+            const stream = api.transcribeLive(uploadResult.filename);
+            for await (const segment of stream) {
+                setSegments(prev => [...prev, segment]);
             }
-
-            const data = await response.json();
-            const processedSegments = data.segments.map((seg: any, index: number) => ({
-                id: seg.id ?? index,
-                start: seg.start,
-                end: seg.end,
-                text: seg.text
-            }));
-            setSegments(processedSegments);
         } catch (error) {
             console.error('Transcription error:', error);
             alert('文字起こしに失敗しました');
@@ -42,22 +29,7 @@ export const useLyricsProcessor = (uploadResult: UploadResult | null) => {
         if (!uploadResult) return;
         setIsExporting(true);
         try {
-            const response = await fetch('http://localhost:8001/export', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    video_filename: uploadResult.filename,
-                    segments: segments,
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Export failed');
-            }
-
-            const data = await response.json();
+            const data = await api.exportVideo(uploadResult.filename, segments);
             alert('動画の書き出しが完了しました。');
 
             const link = document.createElement('a');

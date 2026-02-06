@@ -97,18 +97,19 @@ function App() {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-hidden relative h-[500px]">
+              <div className="w-full">
                 {segments.length > 0 ? (
-                  <div className="absolute inset-0 p-2">
+                  <div className="p-4">
                     <LyricEditor
                       segments={segments}
                       onSegmentsChange={setSegments}
                       currentTime={currentTime}
                       onSeek={handleSeek}
+                      isProcessing={isTranscribing}
                     />
                   </div>
                 ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 p-8 text-center bg-gray-900/50">
+                  <div className="flex-1 flex flex-col items-center justify-center text-gray-500 p-8 text-center bg-gray-900/50">
                     <div className="text-5xl mb-6 opacity-30">📝</div>
                     <p className="text-xl font-medium mb-3 text-gray-300">字幕データがありません</p>
                     <p className="text-sm text-gray-400 leading-relaxed max-w-xs mx-auto">

@@ -1,21 +1,20 @@
-from config import UPLOAD_DIR, WHISPER_MODEL_NAME, DEMUCS_MODEL_NAME, setup_ffmpeg
-import sys
 import os
-import subprocess
+import sys
+import traceback
 from pathlib import Path
 
-import torch
-import torchaudio
-import whisper
 import soundfile as sf
-from demucs.pretrained import get_model
+import torch
 from demucs.apply import apply_model
 from demucs.audio import AudioFile
+from demucs.pretrained import get_model
+from faster_whisper import WhisperModel
+
+from config import (BANNED_PHRASES, DEMUCS_MODEL_NAME, UPLOAD_DIR,
+                    WHISPER_MODEL_NAME, WHISPER_SETTINGS, setup_ffmpeg)
 
 # Initialize FFmpeg on module load
 setup_ffmpeg()
-
-
 
 try:
     from moviepy.video.io.VideoFileClip import VideoFileClip
@@ -26,14 +25,8 @@ except ImportError:
     except ImportError:
         from moviepy import VideoFileClip, AudioFileClip
 
-
-import torch
-import torchaudio
-from demucs.pretrained import get_model
-from demucs.apply import apply_model
-from demucs.audio import AudioFile
-import soundfile as sf
-import whisper
+# --- Constants ---
+# BANNED_PHRASES is now imported from config
 
 def format_timestamp(seconds: float) -> str:
     """
@@ -104,32 +97,86 @@ def burn_subtitles(video_path: Path, srt_path: Path, output_path: Path):
         print(f"Error burning subtitles: {e}")
         return False
 
-def transcribe_audio(audio_path: Path):
+from faster_whisper import WhisperModel
+
+class _WhisperModelManager:
+    _instance = None
+    _model = None
+    _model_name = None
+
+    @classmethod
+    def get_model(cls, model_name: str):
+        if cls._model is None or cls._model_name != model_name:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            # Fast fallback or specific compute type
+            compute_type = "float16" if device == "cuda" else "int8"
+            
+            print(f"--- Loading faster-whisper model ({model_name}) on {device} ({compute_type}) ---")
+            try:
+                cls._model = WhisperModel(model_name, device=device, compute_type=compute_type)
+                cls._model_name = model_name
+            except Exception as e:
+                print(f"Failed to load model on {device}: {e}. Falling back to CPU...")
+                cls._model = WhisperModel(model_name, device="cpu", compute_type="int8")
+                cls._model_name = model_name
+        return cls._model
+
+def transcribe_audio_generator(audio_path: Path):
     """
-    Transcribe audio using OpenAI Whisper.
+    Transcribe audio using faster-whisper and yield segments one by one.
     """
     try:
-        model = whisper.load_model(WHISPER_MODEL_NAME)
+        print(f"--- Start Transcription Generator: {audio_path.name} ---")
+        model = _WhisperModelManager.get_model(WHISPER_MODEL_NAME)
 
-
-        result = model.transcribe(
+        segments, info = model.transcribe(
             str(audio_path),
-            language="ja",
-            verbose=True,
-            fp16=False,
-            beam_size=5,
-            best_of=5,
-            temperature=0.0,
-            condition_on_previous_text=True
+            **WHISPER_SETTINGS
         )
 
+        print(f"Detected language: {info.language} ({info.language_probability:.2f})")
 
-        print(f"Transcription complete: {len(result.get('segments', []))} segments found.")
-        return result
+        for segment in segments:
+            text = segment.text.strip()
+            
+            # Skip if text contains any banned phrases or is empty
+            if any(phrase in text for phrase in BANNED_PHRASES) or not text:
+                print(f"Skipping hallucinated or empty segment: {text}")
+                continue
+                
+            print(f"Segment: [{segment.start:.2f} -> {segment.end:.2f}] {text}")
+            yield {
+                "id": segment.id,
+                "start": round(segment.start, 2),
+                "end": round(segment.end, 2),
+                "text": text
+            }
+            
+        print("--- Transcription Generator Finished ---")
 
     except Exception as e:
-        print(f"Error transcribing audio: {e}")
-        return None
+        print(f"!!! Error in transcribe_audio_generator: {e}")
+        import traceback
+        traceback.print_exc()
+        yield {"error": str(e)}
+
+def transcribe_audio(audio_path: Path):
+    """
+    Transcribe audio using the generator and return results in the original format.
+    (Kept for backward compatibility)
+    """
+    full_result = {
+        "text": "",
+        "segments": []
+    }
+    
+    for segment in transcribe_audio_generator(audio_path):
+        if "error" in segment:
+            return None
+        full_result["segments"].append(segment)
+        full_result["text"] += segment["text"]
+    
+    return full_result
 
 def extract_audio(video_path: Path, output_path: Path):
     """
@@ -175,56 +222,16 @@ def separate_vocals(audio_path: Path, output_dir: Path):
             audio.close()
 
 
-        
-        print("Starting separation...")
-        # Add batch dimension: [1, Channels, Time]
-        sources = apply_model(model, wav[None], device=device, shifts=1, split=True, overlap=0.25, progress=True)[0]
-        
-        # Demucs AudioFile normalizes during read? No, check separate.py
-        # separate.py does normalization:
-        # ref = wav.mean(0)
-        # wav -= ref.mean()
-        # wav /= ref.std()
-        # BUT AudioFile read output is just the tensor.
-        # Wait, separate.py calculates Ref AFTER loading.
-        # So we should apply normalization logic if we want to retrieve original amplitude.
-        
+        # Substrate Demucs normalization
+        # Ref: https://github.com/facebookresearch/demucs/blob/main/demucs/separate.py
         ref = wav.mean(0)
         wav = (wav - ref.mean()) / ref.std()
         
-        # apply_model was called with normalized wav?
-        # Re-reading separate.py:
-        # wav = load_track(...) 
-        # ref = wav.mean(0)
-        # wav -= ref.mean()
-        # wav /= ref.std()
-        # sources = apply_model(...)
-        # sources *= ref.std()
-        # sources += ref.mean()
+        print("Starting separation...")
+        # Add batch dimension: [1, Channels, Time] and apply model
+        sources = apply_model(model, wav[None], device=device, shifts=1, split=True, overlap=0.25, progress=True)[0]
         
-        # But wait, apply_model takes the tensor. We should pass the tensor we normalized?
-        # Yes. But wait, I loaded wav, normalized it in place (or reassigned), then passed to apply_model.
-        # But sources is derived from apply_model output.
-        # Let's be careful with variable names.
-        
-        # Correct logic:
-        # wav_loaded = AudioFile(...).read(...)
-        # ref = wav_loaded.mean(0)
-        # wav_input = (wav_loaded - ref.mean()) / ref.std()
-        # sources = apply_model(..., wav_input[None], ...)
-        # sources = sources * ref.std() + ref.mean()
-        
-        # However, in my code above:
-        # wav = AudioFile(...).read(...)
-        # ref = wav.mean(0)
-        # wav = (wav - ref.mean()) / ref.std()  <-- wav is updated
-        # sources = apply_model(..., wav[None], ...) <-- uses updated wav
-        # sources = sources * ref.std() + ref.mean() <-- restores amplitude
-        
-        # This seems correct IF AudioFile returns raw floating point audio [-1, 1].
-        # AudioFile uses ffmpeg f32le, so yes.
-
-        # Denormalize
+        # Denormalize to restore original amplitude
         sources = sources * ref.std() + ref.mean()
 
         # Save vocals and no_vocals

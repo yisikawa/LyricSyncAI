@@ -14,6 +14,26 @@ SEPARATED_DIR.mkdir(exist_ok=True)
 WHISPER_MODEL_NAME = "medium"
 DEMUCS_MODEL_NAME = "htdemucs"
 
+# Transcription fine-tuning
+WHISPER_SETTINGS = {
+    "beam_size": 5,
+    "language": "ja",
+    "temperature": 0,
+    "condition_on_previous_text": False,
+    "vad_filter": True,
+    "vad_parameters": {"min_speech_duration_ms": 500},
+    "no_speech_threshold": 0.1,
+}
+
+# List of strings to filter out (hallucination prevention)
+BANNED_PHRASES = [
+    "歌詞の文字起こし",
+    "ご視聴ありがとうございました",
+    "チャンネル登録",
+    "文字起こしを行います",
+    "字幕：",
+]
+
 # FFmpeg settings
 FFMPEG_SEARCH_PATHS = [
     "C:\\ffmpeg\\bin",
