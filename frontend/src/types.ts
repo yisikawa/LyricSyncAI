@@ -10,3 +10,5 @@ export type UploadResult = {
     filepath: string;
     message: string;
 };
+
+export type Step = 'upload' | 'vocal' | 'transcribe' | 'edit' | 'export';

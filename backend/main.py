@@ -1,3 +1,4 @@
+# Trigger Reload 2
 from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -66,8 +67,44 @@ def transcribe_endpoint(request: TranscribeRequest):
         if result.get("segments"):
             print(f"First segment: {result['segments'][0].get('text')}")
 
-    return {"text": result["text"], "segments": result["segments"]}
+from fastapi.responses import StreamingResponse
+import json
+from services import perform_transcription_generator
 
+@app.post("/transcribe-live")
+async def transcribe_live_endpoint(request: TranscribeRequest):
+    def event_generator():
+        for segment in perform_transcription_generator(request.filename):
+            # JSON formatted data with newline for streaming
+            # ensure_ascii=False to correctly handle Japanese characters
+            yield json.dumps(segment, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
+
+@app.post("/separate")
+async def separate_endpoint(request: TranscribeRequest):
+    video_path = UPLOAD_DIR / request.filename
+    if not video_path.exists():
+        raise HTTPException(status_code=404, detail="動画ファイルが見つかりません")
+        
+    audio_path = video_path.with_suffix(".mp3")
+    
+    from audio_processor import extract_audio, separate_vocals
+    from config import SEPARATED_DIR
+    
+    # 1. Extract Audio
+    if not extract_audio(video_path, audio_path):
+        raise HTTPException(status_code=500, detail="音声の抽出に失敗しました")
+        
+    # 2. Separate Vocals
+    vocals_path = separate_vocals(audio_path, SEPARATED_DIR)
+    if not vocals_path:
+        raise HTTPException(status_code=500, detail="ボーカルの分離に失敗しました")
+        
+    return {
+        "vocals_url": f"http://localhost:8001/uploads/separated/{Path(vocals_path).name}",
+        "message": "分離が完了しました"
+    }
 
 @app.post("/export")
 def export_endpoint(request: ExportRequest):

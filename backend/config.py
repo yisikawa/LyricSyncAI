@@ -20,9 +20,10 @@ WHISPER_SETTINGS = {
     "language": "ja",
     "temperature": 0,
     "condition_on_previous_text": False,
-    "vad_filter": True,
+    "vad_filter": False,
     "vad_parameters": {"min_speech_duration_ms": 500},
     "no_speech_threshold": 0.1,
+    "initial_prompt": "歌詞",
 }
 
 # List of strings to filter out (hallucination prevention)
@@ -32,6 +33,9 @@ BANNED_PHRASES = [
     "チャンネル登録",
     "文字起こしを行います",
     "字幕：",
+    "歌詞の内容を正確に書き起こします",
+    "歌詞のタイトルやアーティスト名",
+    "歌詞の内容やアーティスト名",
 ]
 
 # FFmpeg settings

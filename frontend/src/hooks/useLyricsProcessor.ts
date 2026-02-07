@@ -7,13 +7,15 @@ export const useLyricsProcessor = (uploadResult: UploadResult | null) => {
     const [isTranscribing, setIsTranscribing] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
 
-    const handleTranscribe = async () => {
-        if (!uploadResult) return;
+    const handleTranscribe = async (audioPath?: string) => {
+        const targetFile = audioPath || uploadResult?.filename;
+        if (!targetFile) return;
+
         setIsTranscribing(true);
         setSegments([]);
 
         try {
-            const stream = api.transcribeLive(uploadResult.filename);
+            const stream = api.transcribeLive(targetFile);
             for await (const segment of stream) {
                 setSegments(prev => [...prev, segment]);
             }
@@ -26,7 +28,7 @@ export const useLyricsProcessor = (uploadResult: UploadResult | null) => {
     };
 
     const handleExport = async () => {
-        if (!uploadResult) return;
+        if (!uploadResult) return null;
         setIsExporting(true);
         try {
             const data = await api.exportVideo(uploadResult.filename, segments);
@@ -38,9 +40,11 @@ export const useLyricsProcessor = (uploadResult: UploadResult | null) => {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            return data;
         } catch (error) {
             console.error('Export error:', error);
             alert('動画の書き出しに失敗しました');
+            return null;
         } finally {
             setIsExporting(false);
         }

@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard]
 python-multipart
 openai-whisper
+faster-whisper
 demucs
 moviepy
 ffmpeg-python

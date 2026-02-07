@@ -260,7 +260,7 @@ def separate_vocals(audio_path: Path, output_dir: Path):
         print(f"Saving to {no_vocals_path}")
         sf.write(str(no_vocals_path), no_vocals_np, model.samplerate)
         
-        return str(vocals_path)
+        return vocals_path
 
 
     except Exception as e:

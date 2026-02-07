@@ -31,34 +31,73 @@ def process_video_background(video_path: Path):
     else:
         print("Audio extraction failed")
 
+def perform_transcription_generator(filename: str):
+    """
+    Perform transcription as a generator. Prioritize separated vocals if available.
+    """
+    # If filename is a URL, extract the relative path from /uploads/
+    if filename.startswith("http"):
+        if "/uploads/" in filename:
+            filename = filename.split("/uploads/")[1]
+        else:
+            filename = Path(filename).name
+            
+    # Now filename is either "demo3.mp4" OR "separated/demo3_vocals.wav"
+    input_path = Path(UPLOAD_DIR) / filename
+    
+    # Logic for finding best audio source:
+    # 1. If filename specifically points to a file, use it.
+    # 2. If it's a video, check if there's a separated vocal track.
+    # 3. If no vocal track, check if there's an extracted audio track.
+    
+    target_path = None
+    
+    if input_path.exists() and input_path.is_file():
+        # If the input specifically points to a separated track or extracted audio, use it directly
+        if "separated" in str(input_path) or input_path.suffix in [".mp3", ".wav"]:
+             target_path = input_path
+    
+    # If we don't have a direct target yet, try to find alternates based on the video filename
+    if not target_path:
+        video_path = Path(UPLOAD_DIR) / filename
+        vocals_path = Path(SEPARATED_DIR) / f"{video_path.stem}_vocals.wav"
+        audio_path = Path(UPLOAD_DIR) / video_path.with_suffix(".mp3").name
+        
+        print(f"--- Searching for audio sources for: {filename} ---")
+        print(f"  Vocals: {vocals_path}")
+        print(f"  Audio: {audio_path}")
+        
+        if vocals_path.exists():
+            target_path = vocals_path
+        elif audio_path.exists():
+            target_path = audio_path
+        elif video_path.exists():
+            target_path = video_path
+    
+    if not target_path or not target_path.exists():
+        print(f"--- ERROR: No audio source found for {filename}")
+        yield {"error": "No audio source found"}
+        return
+         
+    try:
+        from audio_processor import transcribe_audio_generator
+        yield from transcribe_audio_generator(target_path)
+    except Exception as e:
+        print(f"!!! Error in perform_transcription_generator: {e}")
+        yield {"error": str(e)}
+
 def perform_transcription(filename: str):
     """
     Perform transcription. Prioritize separated vocals if available.
+    (Wrapped around generator for compatibility)
     """
-    # 1. Check for separated vocals first
-    video_path = UPLOAD_DIR / filename
-    vocals_path = SEPARATED_DIR / f"{video_path.stem}_vocals.wav"
-    audio_path = UPLOAD_DIR / video_path.with_suffix(".mp3").name
-    
-    print(f"--- Transcription Request ---")
-    print(f"Target Video: {filename}")
-    print(f"Looking for Vocals: {vocals_path}")
-    print(f"Looking for Audio: {audio_path}")
-    
-    if vocals_path.exists():
-        print(f"--- OK: Using separated vocals: {vocals_path}")
-        target_path = vocals_path
-    elif audio_path.exists():
-        print(f"--- OK: Using extracted audio: {audio_path}")
-        target_path = audio_path
-    elif video_path.exists():
-        print(f"--- OK: Using original video file: {video_path}")
-        target_path = video_path
-    else:
-        print(f"--- ERROR: No audio source found for {filename}")
-        return None
-         
-    return transcribe_audio(target_path)
+    full_result = {"text": "", "segments": []}
+    for segment in perform_transcription_generator(filename):
+        if "error" in segment:
+            return None
+        full_result["segments"].append(segment)
+        full_result["text"] += segment["text"]
+    return full_result
 
 
 
