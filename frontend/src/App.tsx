@@ -353,7 +353,7 @@ function App() {
               >
                 <PanelGroup orientation={layoutDirection} className="h-full gap-4">
                   {/* Panel 1: Video Player */}
-                  <Panel defaultSize={35} minSize={20} className="flex flex-col gap-4">
+                  <Panel defaultSize={75} minSize={20} className="flex flex-col gap-4">
                     <div className="h-full overflow-y-auto p-2">
                       <VideoPlayer
                         uploadResult={uploadResult}
@@ -375,7 +375,7 @@ function App() {
                   </PanelResizeHandle>
 
                   {/* Panel 2: Subtitle Editor */}
-                  <Panel defaultSize={65} minSize={30}>
+                  <Panel defaultSize={25} minSize={15}>
                     <div className="bg-gray-900/40 border border-gray-800 rounded-2xl overflow-hidden flex flex-col h-full">
                       <div className="p-4 border-b border-gray-800 bg-gray-800/50 flex justify-between items-center shrink-0">
                         <h3 className="font-bold text-sm uppercase tracking-widest text-gray-400">Subtitle Editor</h3>
