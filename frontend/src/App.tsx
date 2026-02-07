@@ -391,13 +391,62 @@ function App() {
                           <video src={exportedVideoUrl} controls className="w-full" autoPlay />
                         </div>
                         <div className="flex gap-4">
-                          <a
-                            href={exportedVideoUrl}
-                            download={`exported_${uploadResult?.filename}`}
-                            className="flex-1 bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-bold text-center"
+                          <button
+                            onClick={async () => {
+                              if (!exportedVideoUrl || !uploadResult) return;
+
+                              const filename = `exported_${uploadResult.filename}`;
+
+                              try {
+                                toast.info('ダウンロード準備中...');
+                                // 1. 動画データをBlobとして取得
+                                const response = await fetch(exportedVideoUrl);
+                                const blob = await response.blob();
+
+                                // 2. File System Access API を試行 (Chrome/Edgeなど)
+                                if ('showSaveFilePicker' in window) {
+                                  try {
+                                    const handle = await (window as any).showSaveFilePicker({
+                                      suggestedName: filename,
+                                      types: [{
+                                        description: 'Video File',
+                                        accept: { 'video/mp4': ['.mp4'] },
+                                      }],
+                                    });
+
+                                    const writable = await handle.createWritable();
+                                    await writable.write(blob);
+                                    await writable.close();
+                                    toast.success('保存しました');
+                                    return;
+                                  } catch (err: any) {
+                                    // キャンセルされた場合は何もしない
+                                    if (err.name === 'AbortError') return;
+                                    console.warn('File Picker failed, falling back...', err);
+                                  }
+                                }
+
+                                // 3. フォールバック: 従来のダウンロードリンク方式
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.style.display = 'none';
+                                a.href = url;
+                                a.download = filename;
+                                document.body.appendChild(a);
+                                a.click();
+                                window.URL.revokeObjectURL(url);
+                                document.body.removeChild(a);
+                                toast.success('ダウンロードを開始しました'); // フォールバック時のメッセージ
+
+                              } catch (error) {
+                                console.error('Save error:', error);
+                                toast.error('保存中にエラーが発生しました');
+                              }
+                            }}
+                            className="flex-1 bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-bold text-center cursor-pointer text-white"
                           >
                             動画を保存する 💾
-                          </a>
+                          </button>
                         </div>
                       </div>
                     </>
