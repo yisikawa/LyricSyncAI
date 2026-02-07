@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import type { UploadResult, Segment } from '../types';
 import { api } from '../services/api';
 
@@ -21,7 +22,7 @@ export const useLyricsProcessor = (uploadResult: UploadResult | null) => {
             }
         } catch (error) {
             console.error('Transcription error:', error);
-            alert('文字起こしに失敗しました');
+            toast.error('文字起こしに失敗しました');
         } finally {
             setIsTranscribing(false);
         }
@@ -32,18 +33,14 @@ export const useLyricsProcessor = (uploadResult: UploadResult | null) => {
         setIsExporting(true);
         try {
             const data = await api.exportVideo(uploadResult.filename, segments);
-            alert('動画の書き出しが完了しました。');
+            toast.success('動画の書き出しが完了しました。');
 
-            const link = document.createElement('a');
-            link.href = data.url;
-            link.download = data.filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            // Automatic download is disabled to prevent navigation. 
+            // The URL is returned and displayed in the UI for the user to play or download manually.
             return data;
         } catch (error) {
             console.error('Export error:', error);
-            alert('動画の書き出しに失敗しました');
+            toast.error('動画の書き出しに失敗しました');
             return null;
         } finally {
             setIsExporting(false);
