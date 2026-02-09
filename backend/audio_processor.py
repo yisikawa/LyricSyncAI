@@ -75,6 +75,18 @@ def burn_subtitles(video_path: Path, srt_path: Path, output_path: Path):
         srt_abs_path = str(srt_path.absolute()).replace("\\", "/")
         
         print(f"Burning subtitles from {srt_path} into {video_path}")
+
+        # Check if output file exists and try to remove it to check for locks
+        if output_path.exists():
+            try:
+                os.remove(output_path)
+                print(f"Removed existing output file: {output_path}")
+            except PermissionError:
+                print(f"!!! Error: Cannot overwrite {output_path}. The file is likely open in the video player or another program.")
+                # We can't proceed if we can't write
+                return False
+            except Exception as e:
+                print(f"Warning: Could not remove existing file: {e}")
         
         # Add subtitles filter - using filename keyword helps with Windows path escaping in ffmpeg-python
         stream = ffmpeg.input(str(video_path))

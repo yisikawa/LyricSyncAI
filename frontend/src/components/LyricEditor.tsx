@@ -78,7 +78,7 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
                 id="lyric-editor-container"
-                className="absolute inset-0 overflow-y-auto p-4 space-y-2 custom-scrollbar"
+                className="absolute inset-0 overflow-y-auto p-4 space-y-2 hide-scrollbar"
             >
                 {localSegments.map((segment, index) => {
                     const isActive = currentTime >= segment.start && currentTime < segment.end;

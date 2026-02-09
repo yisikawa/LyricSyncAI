@@ -17,7 +17,7 @@ export const StepNavigation: React.FC<StepNavigationProps> = ({
         { key: 'vocal', label: '音声分離', icon: '🎙️' },
         { key: 'transcribe', label: '文字おこし', icon: '✍️' },
         { key: 'edit', label: '字幕編集', icon: '✏️' },
-        { key: 'export', label: '書き出し', icon: '🎬' }
+        { key: 'export', label: '動画書き出し', icon: '🎬' }
     ];
 
     return (

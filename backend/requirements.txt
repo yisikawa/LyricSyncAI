@@ -7,3 +7,5 @@ demucs
 moviepy
 ffmpeg-python
 soundfile
+pydantic-settings
+python-dotenv

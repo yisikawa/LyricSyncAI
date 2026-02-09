@@ -1,10 +1,9 @@
 from pathlib import Path
 from audio_processor import extract_audio, separate_vocals, transcribe_audio, create_srt, burn_subtitles
-from config import UPLOAD_DIR, SEPARATED_DIR
+from config import settings
 
 def get_upload_dir() -> Path:
-    return UPLOAD_DIR
-
+    return settings.upload_dir
 
 def process_video_background(video_path: Path):
     """
@@ -21,7 +20,7 @@ def process_video_background(video_path: Path):
         # 2. Separate Vocals
         print("Starting vocal separation...")
         # Output directory for separated tracks
-        separation_out_dir = SEPARATED_DIR
+        separation_out_dir = settings.separated_dir
         
         vocals_path = separate_vocals(audio_path, separation_out_dir)
         if vocals_path:
@@ -43,7 +42,7 @@ def perform_transcription_generator(filename: str):
             filename = Path(filename).name
             
     # Now filename is either "demo3.mp4" OR "separated/demo3_vocals.wav"
-    input_path = Path(UPLOAD_DIR) / filename
+    input_path = settings.upload_dir / filename
     
     # Logic for finding best audio source:
     # 1. If filename specifically points to a file, use it.
@@ -59,9 +58,9 @@ def perform_transcription_generator(filename: str):
     
     # If we don't have a direct target yet, try to find alternates based on the video filename
     if not target_path:
-        video_path = Path(UPLOAD_DIR) / filename
-        vocals_path = Path(SEPARATED_DIR) / f"{video_path.stem}_vocals.wav"
-        audio_path = Path(UPLOAD_DIR) / video_path.with_suffix(".mp3").name
+        video_path = settings.upload_dir / filename
+        vocals_path = settings.separated_dir / f"{video_path.stem}_vocals.wav"
+        audio_path = settings.upload_dir / video_path.with_suffix(".mp3").name
         
         print(f"--- Searching for audio sources for: {filename} ---")
         print(f"  Vocals: {vocals_path}")
@@ -105,7 +104,7 @@ def export_video_with_subtitles(video_filename: str, segments: list):
     """
     Export video with burned subtitles based on provided segments.
     """
-    video_path = UPLOAD_DIR / video_filename
+    video_path = settings.upload_dir / video_filename
     if not video_path.exists():
         return None
         
@@ -116,7 +115,7 @@ def export_video_with_subtitles(video_filename: str, segments: list):
         
     # 2. Burn subtitles
     output_filename = f"exported_{video_filename}"
-    output_path = UPLOAD_DIR / output_filename
+    output_path = settings.upload_dir / output_filename
     
     if burn_subtitles(video_path, srt_path, output_path):
         return output_filename

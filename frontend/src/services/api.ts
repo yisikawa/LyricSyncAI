@@ -1,9 +1,25 @@
 import type { Segment } from '../types';
 
-const API_BASE_URL = 'http://localhost:8001';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+
+export interface UploadResponse {
+    filename: string;
+    filepath: string;
+    message: string;
+}
+
+export interface SeparationResponse {
+    vocals_url: string;
+    message: string;
+}
+
+export interface ExportResponse {
+    filename: string;
+    url: string;
+}
 
 export const api = {
-    async uploadVideo(file: File): Promise<any> {
+    async uploadVideo(file: File): Promise<UploadResponse> {
         const formData = new FormData();
         formData.append('file', file);
 
@@ -23,7 +39,7 @@ export const api = {
         return await response.json();
     },
 
-    async separateAudio(filename: string): Promise<any> {
+    async separateAudio(filename: string): Promise<SeparationResponse> {
         const response = await fetch(`${API_BASE_URL}/separate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -84,7 +100,7 @@ export const api = {
         }
     },
 
-    async exportVideo(filename: string, segments: Segment[]): Promise<{ url: string; filename: string }> {
+    async exportVideo(filename: string, segments: Segment[]): Promise<ExportResponse> {
         const response = await fetch(`${API_BASE_URL}/export`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -103,5 +119,9 @@ export const api = {
             throw new Error(errorMsg);
         }
         return await response.json();
+    },
+
+    getVideoUrl(filename: string): string {
+        return `${API_BASE_URL}/uploads/${encodeURIComponent(filename)}`;
     }
 };

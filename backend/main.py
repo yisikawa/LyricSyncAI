@@ -9,6 +9,8 @@ from pathlib import Path
 from services import process_video_background, perform_transcription, get_upload_dir, export_video_with_subtitles
 from schemas import TranscribeRequest, ExportRequest
 
+from config import settings
+
 app = FastAPI()
 
 # CORS configuration
@@ -27,7 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = get_upload_dir()
+UPLOAD_DIR = settings.upload_dir
 
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
@@ -69,6 +71,8 @@ def transcribe_endpoint(request: TranscribeRequest):
         if result.get("segments"):
             print(f"First segment: {result['segments'][0].get('text')}")
 
+    return {"text": result["text"], "segments": result["segments"]}
+
 from fastapi.responses import StreamingResponse
 import json
 from services import perform_transcription_generator
@@ -92,19 +96,18 @@ async def separate_endpoint(request: TranscribeRequest):
     audio_path = video_path.with_suffix(".mp3")
     
     from audio_processor import extract_audio, separate_vocals
-    from config import SEPARATED_DIR
     
     # 1. Extract Audio
     if not extract_audio(video_path, audio_path):
         raise HTTPException(status_code=500, detail="音声の抽出に失敗しました")
         
     # 2. Separate Vocals
-    vocals_path = separate_vocals(audio_path, SEPARATED_DIR)
+    vocals_path = separate_vocals(audio_path, settings.separated_dir)
     if not vocals_path:
         raise HTTPException(status_code=500, detail="ボーカルの分離に失敗しました")
         
     return {
-        "vocals_url": f"http://localhost:8001/uploads/separated/{Path(vocals_path).name}",
+        "vocals_url": f"http://localhost:{settings.api_port}/uploads/separated/{Path(vocals_path).name}",
         "message": "分離が完了しました"
     }
 
@@ -117,5 +120,5 @@ def export_endpoint(request: ExportRequest):
         
     return {
         "filename": output_filename,
-        "url": f"http://localhost:8001/uploads/{output_filename}"
+        "url": f"http://localhost:{settings.api_port}/uploads/{output_filename}"
     }

@@ -59,3 +59,5 @@ backend/uploads/
 # Demo files and screenshots
 demo*.mp4
 *.png
+
+.env
