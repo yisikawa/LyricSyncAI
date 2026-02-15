@@ -178,7 +178,31 @@ def export_video_with_subtitles(video_filename: str, segments: list):
     output_filename = f"exported_{video_filename}"
     output_path = settings.upload_dir / output_filename
     
-    if burn_subtitles(video_path, srt_path, output_path):
+    # Check for AI Cover (Vocal only) and Instrumental to create a mixed audio track
+    # AI Vocal: uploads/ai_cover_{stem}.wav
+    # Instrumental: uploads/separated/{stem}_no_vocals.wav
+    
+    ai_vocal_path = settings.upload_dir / f"ai_cover_{video_path.stem}.wav"
+    no_vocals_path = settings.separated_dir / f"{video_path.stem}_no_vocals.wav"
+    
+    replacement_audio_path = None
+    
+    if ai_vocal_path.exists() and no_vocals_path.exists():
+        print(f"Found AI Vocal and Instrumental. Mixing for export...")
+        try:
+            from audio_processor import mix_audio
+            mixed_audio_path = settings.upload_dir / f"mixed_export_{video_path.stem}.mp3"
+            
+            # Mix with default volumes (1.0)
+            if mix_audio(ai_vocal_path, no_vocals_path, mixed_audio_path):
+                 replacement_audio_path = mixed_audio_path
+                 print(f"Using mixed AI audio for export: {mixed_audio_path}")
+            else:
+                 print("Mixing failed, falling back to original audio.")
+        except Exception as e:
+            print(f"Error mixing audio for export: {e}")
+    
+    if burn_subtitles(video_path, srt_path, output_path, audio_path=replacement_audio_path):
         return output_filename
     
     return None

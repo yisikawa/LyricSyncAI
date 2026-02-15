@@ -60,9 +60,10 @@ def create_srt(segments: list, output_path: Path):
         print(f"Error creating SRT: {e}")
         return False
 
-def burn_subtitles(video_path: Path, srt_path: Path, output_path: Path):
+def burn_subtitles(video_path: Path, srt_path: Path, output_path: Path, audio_path: Path = None):
     """
     Burn subtitles into video using FFmpeg.
+    Optionally replace audio track if audio_path is provided.
     """
     try:
         import ffmpeg
@@ -75,6 +76,8 @@ def burn_subtitles(video_path: Path, srt_path: Path, output_path: Path):
         srt_abs_path = str(srt_path.absolute()).replace("\\", "/")
         
         print(f"Burning subtitles from {srt_path} into {video_path}")
+        if audio_path:
+             print(f"Replacing audio with: {audio_path}")
 
         # Check if output file exists and try to remove it to check for locks
         if output_path.exists():
@@ -90,12 +93,20 @@ def burn_subtitles(video_path: Path, srt_path: Path, output_path: Path):
         
         # Add subtitles filter - using filename keyword helps with Windows path escaping in ffmpeg-python
         stream = ffmpeg.input(str(video_path))
-        audio = stream.audio
+        
+        if audio_path and audio_path.exists():
+            # Use external audio input
+            audio = ffmpeg.input(str(audio_path)).audio
+        else:
+            # Use original video's audio
+            audio = stream.audio
+            
         video = stream.video.filter("subtitles", filename=srt_abs_path)
 
         
         # Output with high quality
-        out = ffmpeg.output(video, audio, str(output_path), vcodec='libx264', acodec='copy', crf=23)
+        # Use aac for audio codec to ensure compatibility when replacing audio
+        out = ffmpeg.output(video, audio, str(output_path), vcodec='libx264', acodec='aac', crf=23)
         
         # Run FFmpeg
         # overwrite_output=True corresponds to -y
