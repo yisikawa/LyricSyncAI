@@ -48,6 +48,7 @@ pnpm-debug.log*
 
 # Backend specific
 backend/.venv
+backend/models/
 
 # Frontend specific
 frontend/node_modules/

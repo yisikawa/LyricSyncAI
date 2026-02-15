@@ -10,6 +10,8 @@ export interface UploadResponse {
 
 export interface SeparationResponse {
     vocals_url: string;
+    ai_cover_url?: string;
+    instrumental_url?: string;
     message: string;
 }
 

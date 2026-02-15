@@ -11,6 +11,8 @@ export const useLyricSync = () => {
     const [activeStep, setActiveStep] = useState<Step>('upload');
     const [uploadResult, setUploadResult] = useState<UploadResponse | null>(null);
     const [vocalPath, setVocalPath] = useState<string | null>(null);
+    const [instrumentalPath, setInstrumentalPath] = useState<string | null>(null);
+    const [aiCoverPath, setAiCoverPath] = useState<string | null>(null);
     const [segments, setSegments] = useState<Segment[]>([]);
     const [currentTime, setCurrentTime] = useState(0);
     const [isUploading, setIsUploading] = useState(false);
@@ -55,6 +57,16 @@ export const useLyricSync = () => {
             // Actually separateAudio backend returns full URL in vocals_url?
             // Let's assume we use the original filename for transcription as per backend logic which looks for separated files automatically.
             setVocalPath(result.vocals_url);
+            if (result.instrumental_url) {
+                setInstrumentalPath(result.instrumental_url);
+            }
+
+            // Phase 1: AI Cover support
+            if (result.ai_cover_url) {
+                setAiCoverPath(result.ai_cover_url);
+                toast.success('AIカバー生成完了');
+            }
+
             toast.success('ボーカル分離完了');
             unlockStep('transcribe');
             // setActiveStep('transcribe'); // Auto-nav disabled
@@ -147,6 +159,8 @@ export const useLyricSync = () => {
         unlockedSteps,
         uploadResult,
         vocalPath,
+        instrumentalPath,
+        aiCoverPath,
         segments,
         currentTime,
         isUploading,

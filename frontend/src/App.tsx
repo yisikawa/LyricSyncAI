@@ -20,6 +20,8 @@ function App() {
     unlockedSteps,
     uploadResult,
     vocalPath,
+    instrumentalPath,
+    aiCoverPath,
     segments,
     currentTime,
     isUploading,
@@ -167,6 +169,28 @@ function App() {
                         // If no vocal path yet, show option to start
                         <div className="w-full p-6 bg-gray-900 rounded-2xl border border-gray-800 flex flex-col items-center justify-center gap-4 shadow-xl">
                           <div className="text-center text-gray-400">ボーカル抽出を待機中</div>
+                        </div>
+                      )}
+
+                      {/* Instrumental Track */}
+                      {instrumentalPath && (
+                        <div className="w-full mt-6 p-6 bg-gray-900 rounded-2xl border border-gray-800 flex flex-col items-center justify-center gap-4 shadow-xl">
+                          <div className="p-4 bg-yellow-500/20 rounded-full animate-pulse">
+                            <span className="text-4xl">🎸</span>
+                          </div>
+                          <h3 className="text-white font-bold text-lg">抽出された伴奏 (Instrumental)</h3>
+                          <audio controls src={instrumentalPath} className="w-full mt-2" />
+                        </div>
+                      )}
+
+                      {/* AI Cover Integration */}
+                      {aiCoverPath && (
+                        <div className="w-full mt-6 p-6 bg-indigo-900/30 rounded-2xl border border-indigo-500/30 flex flex-col items-center justify-center gap-4 shadow-xl">
+                          <div className="p-4 bg-indigo-500/20 rounded-full animate-pulse">
+                            <span className="text-4xl">🤖</span>
+                          </div>
+                          <h3 className="text-white font-bold text-lg">AIカバー (RVC)</h3>
+                          <audio controls src={aiCoverPath} className="w-full mt-2" />
                         </div>
                       )}
                     </div>

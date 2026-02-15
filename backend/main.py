@@ -102,14 +102,28 @@ async def separate_endpoint(request: TranscribeRequest):
         raise HTTPException(status_code=500, detail="音声の抽出に失敗しました")
         
     # 2. Separate Vocals
-    vocals_path = separate_vocals(audio_path, settings.separated_dir)
+    vocals_path, no_vocals_path = separate_vocals(audio_path, settings.separated_dir)
     if not vocals_path:
         raise HTTPException(status_code=500, detail="ボーカルの分離に失敗しました")
         
-    return {
+    # 3. RVC Conversion (Phase 1)
+    # RVC uses vocals_path, but mixing will use no_vocals_path (handled inside generate_ai_cover via filename assumption,
+    # or ideally passed explicitly. For now keeping as is since generate_ai_cover was written to find it.)
+    
+    from services import generate_ai_cover
+    ai_cover_path = generate_ai_cover(video_path, vocals_path)
+    
+    response_data = {
         "vocals_url": f"http://localhost:{settings.api_port}/uploads/separated/{Path(vocals_path).name}",
+        "instrumental_url": f"http://localhost:{settings.api_port}/uploads/separated/{Path(no_vocals_path).name}",
         "message": "分離が完了しました"
     }
+    
+    if ai_cover_path:
+        response_data["ai_cover_url"] = f"http://localhost:{settings.api_port}/uploads/{Path(ai_cover_path).name}"
+        response_data["message"] += "（AI歌声変換も完了しました）"
+        
+    return response_data
 
 @app.post("/export")
 def export_endpoint(request: ExportRequest):

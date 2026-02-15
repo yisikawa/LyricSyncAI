@@ -10,6 +10,14 @@ class Settings(BaseSettings):
     api_port: int = 8001
     ffmpeg_path: str = "ffmpeg"  # Default to 'ffmpeg' in PATH
     
+    rvc_model_path: Path = Path("models/rvc/model.pth")
+    rvc_index_path: Path = Path("models/rvc/model.index")
+    rvc_f0_method: str = "rmvpe"
+
+    @property
+    def rvc_output_dir(self) -> Path:
+        return self.upload_dir / "converted"
+
     @property
     def separated_dir(self) -> Path:
         return self.upload_dir / "separated"
@@ -22,6 +30,10 @@ class Settings(BaseSettings):
 settings = Settings()
 settings.upload_dir.mkdir(parents=True, exist_ok=True)
 settings.separated_dir.mkdir(parents=True, exist_ok=True)
+settings.rvc_output_dir.mkdir(parents=True, exist_ok=True)
+
+if not settings.rvc_model_path.parent.exists():
+    settings.rvc_model_path.parent.mkdir(parents=True, exist_ok=True)
 
 # Legacy constants for compatibility
 UPLOAD_DIR = settings.upload_dir

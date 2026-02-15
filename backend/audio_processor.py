@@ -272,11 +272,53 @@ def separate_vocals(audio_path: Path, output_dir: Path):
         print(f"Saving to {no_vocals_path}")
         sf.write(str(no_vocals_path), no_vocals_np, model.samplerate)
         
-        return vocals_path
+        return vocals_path, no_vocals_path
 
 
     except Exception as e:
         print(f"Error separating vocals: {e}")
         import traceback
         traceback.print_exc()
-        return None
+        return None, None
+
+def mix_audio(vocal_path: Path, inst_path: Path, output_path: Path, vocal_volume: float = 1.0, inst_volume: float = 1.0):
+    """
+    Mix vocal and instrumental tracks with volume adjustments using FFmpeg.
+    """
+    try:
+        import ffmpeg
+        
+        if not vocal_path.exists() or not inst_path.exists():
+            print(f"One of the input files for mixing does not exist: {vocal_path}, {inst_path}")
+            return False
+
+        print(f"Mixing audio: {vocal_path} + {inst_path} -> {output_path}")
+
+        # Input streams with volume adjustment
+        # Note: volume filter accepts a number (1.0 = original, 0.5 = half, etc.)
+        vocal = ffmpeg.input(str(vocal_path)).filter('volume', volume=vocal_volume)
+        inst = ffmpeg.input(str(inst_path)).filter('volume', volume=inst_volume)
+        
+        # amix filter mixes multiple audio streams. duration='longest' preserves full length if one is shorter (usually same length)
+        # dropout_transition=0 prevents volume drops
+        mixed = ffmpeg.filter([vocal, inst], 'amix', inputs=2, duration='longest')
+        
+        # Output as MP3 or WAV depending on extension
+        out = ffmpeg.output(mixed, str(output_path), audio_bitrate='192k')
+        
+        out.run(overwrite_output=True, quiet=True)
+        
+        print(f"Mixed audio saved to: {output_path}")
+        return True
+    except ffmpeg.Error as e:
+        if hasattr(e, 'stderr') and e.stderr:
+            print(f"FFmpeg error: {e.stderr.decode()}")
+        else:
+            print(f"FFmpeg or other error during mixing: {e}")
+        return False
+    except Exception as e:
+        print(f"Error mixing audio: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+

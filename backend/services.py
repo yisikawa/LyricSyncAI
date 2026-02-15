@@ -5,6 +5,56 @@ from config import settings
 def get_upload_dir() -> Path:
     return settings.upload_dir
 
+def generate_ai_cover(video_path: Path, vocals_path: Path):
+    """
+    Generate AI Cover by converting vocals and mixing with instrumental.
+    Returns the path to the mixed audio file if successful, otherwise None.
+    """
+    try:
+        from rvc_inference import get_rvc_wrapper
+        from audio_processor import mix_audio
+        
+        rvc = get_rvc_wrapper()
+        
+        # Check if model exists
+        if not settings.rvc_model_path.exists():
+            print(f"RVC model not found at {settings.rvc_model_path}. Skipping.")
+            return None
+
+        print(f"Starting Voice Conversion with model: {settings.rvc_model_path.name}")
+        
+        # Load Model
+        if rvc.load_model(settings.rvc_model_path, settings.rvc_index_path):
+            
+            converted_vocals_path = settings.rvc_output_dir / f"{video_path.stem}_converted.wav"
+            
+            # Infer
+            if rvc.infer(vocals_path, converted_vocals_path, pitch_change=0, f0_method=settings.rvc_f0_method):
+                print(f"Voice Conversion successful: {converted_vocals_path}")
+                
+                # Mix with Instrumental
+                no_vocals_path = settings.separated_dir / f"{video_path.stem}_no_vocals.wav"
+                mixed_output_path = settings.upload_dir / f"ai_cover_{video_path.stem}.mp3"
+                
+                if no_vocals_path.exists():
+                    if mix_audio(converted_vocals_path, no_vocals_path, mixed_output_path):
+                        print(f"AI Cover created successfully: {mixed_output_path}")
+                        return mixed_output_path
+                    else:
+                        print("Mixing failed")
+                else:
+                    print(f"Instrumental track not found: {no_vocals_path}")
+            else:
+                print("Voice Conversion failed")
+        else:
+                print("Failed to load RVC model")
+    except Exception as e:
+        print(f"Error during Voice Conversion phase: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return None
+
 def process_video_background(video_path: Path):
     """
     Process uploaded video in background: extract audio and separate vocals.
@@ -22,9 +72,13 @@ def process_video_background(video_path: Path):
         # Output directory for separated tracks
         separation_out_dir = settings.separated_dir
         
-        vocals_path = separate_vocals(audio_path, separation_out_dir)
+        vocals_path, _ = separate_vocals(audio_path, separation_out_dir)
         if vocals_path:
              print(f"Vocal separation successful: {vocals_path}")
+             
+             # 3. Voice Conversion (RVC) & Mixing
+             generate_ai_cover(video_path, vocals_path)
+             
         else:
              print("Vocal separation failed")
     else:
