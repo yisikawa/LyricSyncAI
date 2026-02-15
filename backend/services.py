@@ -32,18 +32,25 @@ def generate_ai_cover(video_path: Path, vocals_path: Path):
             if rvc.infer(vocals_path, converted_vocals_path, pitch_change=0, f0_method=settings.rvc_f0_method):
                 print(f"Voice Conversion successful: {converted_vocals_path}")
                 
-                # Mix with Instrumental
-                no_vocals_path = settings.separated_dir / f"{video_path.stem}_no_vocals.wav"
-                mixed_output_path = settings.upload_dir / f"ai_cover_{video_path.stem}.mp3"
+                # Mix with Instrumental - DISABLED based on user feedback
+                # no_vocals_path = settings.separated_dir / f"{video_path.stem}_no_vocals.wav"
+                # mixed_output_path = settings.upload_dir / f"ai_cover_{video_path.stem}.mp3"
                 
-                if no_vocals_path.exists():
-                    if mix_audio(converted_vocals_path, no_vocals_path, mixed_output_path):
-                        print(f"AI Cover created successfully: {mixed_output_path}")
-                        return mixed_output_path
-                    else:
-                        print("Mixing failed")
-                else:
-                    print(f"Instrumental track not found: {no_vocals_path}")
+                # if no_vocals_path.exists():
+                #     if mix_audio(converted_vocals_path, no_vocals_path, mixed_output_path):
+                #         print(f"AI Cover created successfully: {mixed_output_path}")
+                #         return mixed_output_path
+                #     else:
+                #         print("Mixing failed")
+                # else:
+                #     print(f"Instrumental track not found: {no_vocals_path}")
+
+                # Return only converted vocals (Acapella)
+                import shutil
+                ai_vocal_path = settings.upload_dir / f"ai_cover_{video_path.stem}.wav"
+                shutil.copy(str(converted_vocals_path), str(ai_vocal_path))
+                print(f"AI Vocal produced: {ai_vocal_path}")
+                return ai_vocal_path
             else:
                 print("Voice Conversion failed")
         else:
