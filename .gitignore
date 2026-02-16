@@ -61,4 +61,9 @@ backend/uploads/
 demo*.mp4
 *.png
 
+
+# Environment Variables
 .env
+
+# Backup Models
+backend/model_bkup/
