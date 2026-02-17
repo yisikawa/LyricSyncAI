@@ -1,6 +1,6 @@
 from pathlib import Path
 from audio_processor import extract_audio, separate_vocals, transcribe_audio, create_srt, burn_subtitles
-from config import settings
+from config import settings, load_ai_params
 
 def get_upload_dir() -> Path:
     return settings.upload_dir
@@ -16,20 +16,37 @@ def generate_ai_cover(video_path: Path, vocals_path: Path):
         
         rvc = get_rvc_wrapper()
         
+        # Load params
+        params = load_ai_params()
+        rvc_params = params.get("rvc", {})
+
+        model_filename = rvc_params.get("model_filename", "model.pth")
+        index_filename = rvc_params.get("index_filename", "model.index")
+        
+        # Construct full paths using config directory
+        model_path = settings.rvc_model_dir / model_filename
+        index_path = settings.rvc_model_dir / index_filename
+
         # Check if model exists
-        if not settings.rvc_model_path.exists():
-            print(f"RVC model not found at {settings.rvc_model_path}. Skipping.")
+        if not model_path.exists():
+            print(f"RVC model not found at {model_path}. Skipping.")
             return None
 
-        print(f"Starting Voice Conversion with model: {settings.rvc_model_path.name}")
+        print(f"Starting Voice Conversion with model: {model_path.name}")
         
         # Load Model
-        if rvc.load_model(settings.rvc_model_path, settings.rvc_index_path):
+        if rvc.load_model(model_path, index_path):
             
             converted_vocals_path = settings.rvc_output_dir / f"{video_path.stem}_converted.wav"
             
             # Infer
-            if rvc.infer(vocals_path, converted_vocals_path, pitch_change=0, f0_method=settings.rvc_f0_method):
+            if rvc.infer(
+                vocals_path, 
+                converted_vocals_path, 
+                pitch_change=rvc_params.get("pitch_change", 0), 
+                f0_method=rvc_params.get("f0_method", "rmvpe"),
+                index_rate=rvc_params.get("index_rate", 0.75)
+            ):
                 print(f"Voice Conversion successful: {converted_vocals_path}")
                 
                 # Mix with Instrumental - DISABLED based on user feedback
@@ -189,12 +206,22 @@ def export_video_with_subtitles(video_filename: str, segments: list):
     
     if ai_vocal_path.exists() and no_vocals_path.exists():
         print(f"Found AI Vocal and Instrumental. Mixing for export...")
+        
+        params = load_ai_params()
+        mix_params = params.get("mixing", {})
+        
         try:
             from audio_processor import mix_audio
             mixed_audio_path = settings.upload_dir / f"mixed_export_{video_path.stem}.mp3"
             
-            # Mix with default volumes (1.0)
-            if mix_audio(ai_vocal_path, no_vocals_path, mixed_audio_path):
+            # Mix with params
+            if mix_audio(
+                ai_vocal_path, 
+                no_vocals_path, 
+                mixed_audio_path,
+                vocal_volume=mix_params.get("vocal_volume", 1.0),
+                inst_volume=mix_params.get("inst_volume", 1.0)
+            ):
                  replacement_audio_path = mixed_audio_path
                  print(f"Using mixed AI audio for export: {mixed_audio_path}")
             else:

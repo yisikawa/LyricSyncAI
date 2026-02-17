@@ -15,6 +15,7 @@ class RVCInferenceWrapper:
         self.rvc = None
         self.model_loaded = False
         self.current_model_path = None
+        self.current_index_path = None
         
         try:
             from rvc_python.infer import RVCInference
@@ -43,8 +44,10 @@ class RVCInferenceWrapper:
             return False
             
         try:
-            # Avoid reloading if same model
-            if self.model_loaded and self.current_model_path == model_path:
+            # Avoid reloading if same model AND same index
+            if (self.model_loaded and 
+                self.current_model_path == model_path and 
+                self.current_index_path == index_path):
                 return True
                 
             logger.info(f"Loading RVC model from {model_path}")
@@ -62,6 +65,7 @@ class RVCInferenceWrapper:
                 
             self.model_loaded = True
             self.current_model_path = model_path
+            self.current_index_path = index_path
             return True
         except Exception as e:
             logger.error(f"Error loading RVC model: {e}")

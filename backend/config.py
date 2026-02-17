@@ -19,6 +19,10 @@ class Settings(BaseSettings):
         return self.upload_dir / "converted"
 
     @property
+    def rvc_model_dir(self) -> Path:
+        return self.rvc_model_path.parent
+
+    @property
     def separated_dir(self) -> Path:
         return self.upload_dir / "separated"
     
@@ -84,4 +88,46 @@ def setup_ffmpeg():
         print("Please install FFmpeg and set FFMPEG_PATH in .env or ensure it is in your system PATH.")
     else:
         print(f"FFmpeg confirmed: {shutil.which('ffmpeg')}")
+
+import json
+
+AI_PARAMS_FILE = Path("ai_cover_params.json").absolute()
+
+def load_ai_params():
+    """
+    AIカバー生成用のパラメータをJSONから読み込む。
+    ファイルがない、またはエラーの場合はデフォルト値を返す。
+    """
+    defaults = {
+        "rvc": {
+            "model_filename": "model.pth", 
+            "index_filename": "model.index",
+            "pitch_change": 0,
+            "f0_method": "rmvpe",
+            "index_rate": 0.75
+        },
+        "mixing": {
+            "vocal_volume": 1.0, 
+            "inst_volume": 1.0
+        }
+    }
+
+    if not AI_PARAMS_FILE.exists():
+        return defaults
+
+    try:
+        with open(AI_PARAMS_FILE, "r", encoding="utf-8") as f:
+            params = json.load(f)
+            # マージ処理（JSONに足りないキーがあればデフォルトを使う）
+            for section, values in defaults.items():
+                if section not in params:
+                    params[section] = values.copy()
+                else:
+                    for k, v in values.items():
+                        if k not in params[section]:
+                            params[section][k] = v
+            return params
+    except Exception as e:
+        print(f"Error loading {AI_PARAMS_FILE}: {e}")
+        return defaults
 

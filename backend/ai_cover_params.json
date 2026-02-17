@@ -1,0 +1,13 @@
+{
+    "rvc": {
+        "model_filename": "sachiyo-voice.pth.pth",
+        "index_filename": "sachiyo-voice.index",
+        "pitch_change": 0,
+        "f0_method": "rmvpe",
+        "index_rate": 0.75
+    },
+    "mixing": {
+        "vocal_volume": 1.0,
+        "inst_volume": 1.0
+    }
+}
