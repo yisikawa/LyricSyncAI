@@ -1,6 +1,6 @@
 {
     "rvc": {
-        "model_filename": "sachiyo-voice.pth.pth",
+        "model_filename": "sachiyo-voice.pth",
         "index_filename": "sachiyo-voice.index",
         "pitch_change": 0,
         "f0_method": "rmvpe",
