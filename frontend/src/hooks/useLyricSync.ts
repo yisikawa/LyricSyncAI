@@ -170,7 +170,12 @@ export const useLyricSync = () => {
 
         // Actions
         setSegments,
-        setActiveStep,
+        setActiveStep: (step: Step) => {
+            setActiveStep(step);
+            if (step === 'edit') {
+                setExportResult(null); // 字幕編集画面に入った時点で書き出しステータスをリセット
+            }
+        },
         handleFileUpload,
         handleVocalSeparation,
         handleSkipSeparation,
