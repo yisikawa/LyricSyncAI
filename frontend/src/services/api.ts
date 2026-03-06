@@ -102,13 +102,14 @@ export const api = {
         }
     },
 
-    async exportVideo(filename: string, segments: Segment[]): Promise<ExportResponse> {
+    async exportVideo(filename: string, segments: Segment[], useOriginalVoice: boolean = false): Promise<ExportResponse> {
         const response = await fetch(`${API_BASE_URL}/export`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 video_filename: filename,
                 segments: segments,
+                use_original_voice: useOriginalVoice,
             }),
         });
 

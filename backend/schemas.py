@@ -13,3 +13,4 @@ class TranscribeRequest(BaseModel):
 class ExportRequest(BaseModel):
     video_filename: str
     segments: List[Segment]
+    use_original_voice: bool = False

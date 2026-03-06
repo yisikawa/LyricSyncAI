@@ -27,6 +27,7 @@ function App() {
     isUploading,
     isProcessing,
     exportResult,
+    useOriginalVoice,
     videoRef,
     setSegments,
     setActiveStep,
@@ -69,9 +70,9 @@ function App() {
     }
     // アクティブステップがexportで、まだ結果がなく、処理中でなければ自動実行
     if (activeStep === 'export' && !exportResult && !isProcessing) {
-      handleExport();
+      handleExport(useOriginalVoice);
     }
-  }, [activeStep, vocalPath, isProcessing, segments.length, exportResult]);
+  }, [activeStep, vocalPath, isProcessing, segments.length, exportResult, useOriginalVoice]);
 
   return (
     <div className="min-h-screen w-full bg-gray-950 text-white flex flex-col overflow-x-hidden">
@@ -356,7 +357,9 @@ function App() {
                   {isProcessing ? (
                     <div className="py-20 flex flex-col items-center">
                       <div className="w-16 h-16 border-4 border-green-500/20 border-t-green-500 rounded-full animate-spin mb-6" />
-                      <h3 className="text-2xl font-bold text-white mb-2">動画を書き出し中...</h3>
+                      <h3 className="text-2xl font-bold text-white mb-2">
+                        動画を書き出し中... {useOriginalVoice && <span className="text-sm text-yellow-500 ml-2">(元の音声を使用)</span>}
+                      </h3>
                       <p className="text-green-400 font-medium">字幕を焼き付けています。しばらくお待ちください。</p>
                     </div>
                   ) : exportResult ? ( // Use local exportResult or check exportedVideoUrl if managed in hook

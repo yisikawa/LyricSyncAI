@@ -3,7 +3,7 @@ import type { Step } from '../types';
 
 interface StepNavigationProps {
     currentStep: Step;
-    onStepChange: (step: Step) => void;
+    onStepChange: (step: Step, options?: { ctrlKey: boolean }) => void;
     unlockedSteps: Step[];
 }
 
@@ -44,7 +44,7 @@ export const StepNavigation: React.FC<StepNavigationProps> = ({
                 return (
                     <div
                         key={step.key}
-                        onClick={() => isUnlocked && onStepChange(step.key)}
+                        onClick={(e) => isUnlocked && onStepChange(step.key, { ctrlKey: e.ctrlKey })}
                         style={{
                             flex: 1,
                             display: 'flex',

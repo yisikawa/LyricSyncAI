@@ -18,6 +18,7 @@ export const useLyricSync = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [exportResult, setExportResult] = useState<ExportResponse | null>(null);
+    const [useOriginalVoice, setUseOriginalVoice] = useState(false);
 
     const [unlockedSteps, setUnlockedSteps] = useState<Step[]>(['upload']);
 
@@ -113,11 +114,11 @@ export const useLyricSync = () => {
         }
     };
 
-    const handleExport = async () => {
+    const handleExport = async (originalVoiceFlag: boolean = false) => {
         if (!uploadResult) return;
         setIsProcessing(true);
         try {
-            const result = await api.exportVideo(uploadResult.filename, segments);
+            const result = await api.exportVideo(uploadResult.filename, segments, originalVoiceFlag);
             setExportResult(result);
             toast.success('書き出し完了');
             return result;
@@ -166,14 +167,18 @@ export const useLyricSync = () => {
         isUploading,
         isProcessing,
         exportResult,
+        useOriginalVoice,
         videoRef,
 
         // Actions
         setSegments,
-        setActiveStep: (step: Step) => {
+        setActiveStep: (step: Step, options?: { ctrlKey: boolean }) => {
             setActiveStep(step);
-            if (step === 'edit') {
+            if (step === 'export' && options?.ctrlKey) {
+                setUseOriginalVoice(true);
+            } else if (step === 'edit') {
                 setExportResult(null); // 字幕編集画面に入った時点で書き出しステータスをリセット
+                setUseOriginalVoice(false);
             }
         },
         handleFileUpload,

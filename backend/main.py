@@ -127,7 +127,7 @@ async def separate_endpoint(request: TranscribeRequest):
 
 @app.post("/export")
 def export_endpoint(request: ExportRequest):
-    output_filename = export_video_with_subtitles(request.video_filename, request.segments)
+    output_filename = export_video_with_subtitles(request.video_filename, request.segments, request.use_original_voice)
     
     if output_filename is None:
         raise HTTPException(status_code=500, detail="動画の書き出しに失敗しました")

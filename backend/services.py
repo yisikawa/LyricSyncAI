@@ -178,7 +178,7 @@ def perform_transcription(filename: str):
 
 
 
-def export_video_with_subtitles(video_filename: str, segments: list):
+def export_video_with_subtitles(video_filename: str, segments: list, use_original_voice: bool = False):
     """
     Export video with burned subtitles based on provided segments.
     """
@@ -204,7 +204,7 @@ def export_video_with_subtitles(video_filename: str, segments: list):
     
     replacement_audio_path = None
     
-    if ai_vocal_path.exists() and no_vocals_path.exists():
+    if not use_original_voice and ai_vocal_path.exists() and no_vocals_path.exists():
         print(f"Found AI Vocal and Instrumental. Mixing for export...")
         
         params = load_ai_params()
