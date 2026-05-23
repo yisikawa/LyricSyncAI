@@ -1,6 +1,6 @@
 import type { Segment } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001';
+const API_BASE_URL = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8001`;
 
 export interface UploadResponse {
     filename: string;
