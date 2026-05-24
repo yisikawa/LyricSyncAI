@@ -14,10 +14,17 @@ from config import settings
 app = FastAPI()
 
 # CORS configuration
+origins = [
+    "http://localhost:5150",
+    "https://localhost:5150",
+    "http://192.168.111.10:5150",
+    "https://192.168.111.10:5150",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
