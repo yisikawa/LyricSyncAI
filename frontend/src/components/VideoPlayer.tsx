@@ -25,7 +25,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     React.useEffect(() => {
         let url = '';
         if (uploadResult?.filename) {
-            url = `http://localhost:8001/uploads/${encodeURIComponent(uploadResult.filename)}`;
+            const apiBase = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8001`;
+            url = `${apiBase}/uploads/${encodeURIComponent(uploadResult.filename)}`;
         } else if (localFile) {
             url = URL.createObjectURL(localFile);
         }

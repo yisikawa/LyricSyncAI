@@ -1,5 +1,5 @@
 # Trigger Reload 2
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import shutil
@@ -88,7 +88,7 @@ async def transcribe_live_endpoint(request: TranscribeRequest):
     return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
 @app.post("/separate")
-async def separate_endpoint(request: TranscribeRequest):
+async def separate_endpoint(request: TranscribeRequest, req: Request):
     video_path = UPLOAD_DIR / request.filename
     if not video_path.exists():
         raise HTTPException(status_code=404, detail="動画ファイルが見つかりません")
@@ -113,26 +113,28 @@ async def separate_endpoint(request: TranscribeRequest):
     from services import generate_ai_cover
     ai_cover_path = generate_ai_cover(video_path, vocals_path)
     
+    base = str(req.base_url).rstrip("/")
     response_data = {
-        "vocals_url": f"http://localhost:{settings.api_port}/uploads/separated/{Path(vocals_path).name}",
-        "instrumental_url": f"http://localhost:{settings.api_port}/uploads/separated/{Path(no_vocals_path).name}",
+        "vocals_url": f"{base}/uploads/separated/{Path(vocals_path).name}",
+        "instrumental_url": f"{base}/uploads/separated/{Path(no_vocals_path).name}",
         "message": "分離が完了しました"
     }
-    
+
     if ai_cover_path:
-        response_data["ai_cover_url"] = f"http://localhost:{settings.api_port}/uploads/{Path(ai_cover_path).name}"
+        response_data["ai_cover_url"] = f"{base}/uploads/{Path(ai_cover_path).name}"
         response_data["message"] += "（AI歌声変換も完了しました）"
         
     return response_data
 
 @app.post("/export")
-def export_endpoint(request: ExportRequest):
+async def export_endpoint(request: ExportRequest, req: Request):
     output_filename = export_video_with_subtitles(request.video_filename, request.segments, request.use_original_voice)
-    
+
     if output_filename is None:
         raise HTTPException(status_code=500, detail="動画の書き出しに失敗しました")
-        
+
+    base = str(req.base_url).rstrip("/")
     return {
         "filename": output_filename,
-        "url": f"http://localhost:{settings.api_port}/uploads/{output_filename}"
+        "url": f"{base}/uploads/{output_filename}"
     }

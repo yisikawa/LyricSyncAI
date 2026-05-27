@@ -54,7 +54,9 @@ BANNED_PHRASES = [
     "ご視聴",
     "Thanks for watching",
     "Subscribe",
-    "Like and Subscribe"
+    "Like and Subscribe",
+    "歌詞を書き起こしてください",
+    "歌詞の字幕を作成します",
 ]
 
 WHISPER_SETTINGS = {
@@ -64,7 +66,6 @@ WHISPER_SETTINGS = {
     "log_prob_threshold": -1.0,
     "no_speech_threshold": 0.6,
     "condition_on_previous_text": False,
-    "initial_prompt": "歌詞の字幕を作成します。歌の歌詞を書き起こしてください。"
 }
 
 def setup_ffmpeg():

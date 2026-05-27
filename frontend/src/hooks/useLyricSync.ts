@@ -174,10 +174,11 @@ export const useLyricSync = () => {
         setSegments,
         setActiveStep: (step: Step, options?: { ctrlKey: boolean }) => {
             setActiveStep(step);
-            if (step === 'export' && options?.ctrlKey) {
-                setUseOriginalVoice(true);
+            if (step === 'export') {
+                setExportResult(null); // 毎回リセットして再書き出しを可能にする
+                setUseOriginalVoice(!(options?.ctrlKey ?? false));
             } else if (step === 'edit') {
-                setExportResult(null); // 字幕編集画面に入った時点で書き出しステータスをリセット
+                setExportResult(null);
                 setUseOriginalVoice(false);
             }
         },

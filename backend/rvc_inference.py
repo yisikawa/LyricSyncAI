@@ -45,24 +45,22 @@ class RVCInferenceWrapper:
             
         try:
             # Avoid reloading if same model AND same index
-            if (self.model_loaded and 
-                self.current_model_path == model_path and 
+            if (self.model_loaded and
+                self.current_model_path == model_path and
                 self.current_index_path == index_path):
                 return True
-                
+
             logger.info(f"Loading RVC model from {model_path}")
-            # rvc-python load_model might accept strings
-            self.rvc.load_model(str(model_path))
-            
-            # Index is optional but recommended
-            if index_path and index_path.exists():
-                logger.info(f"Loading RVC index from {index_path}")
-                # Assuming api supports index loading somehow, or it's part of load_model?
-                # rvc-python documentation varies, but usually it's handled automatically if in same dir 
-                # or passed as argument. Let's assume standard usage.
-                # If rvc-python doesn't support explicit index load in this version, we might need to adjust.
-                pass 
-                
+            # rvc_python's load_model expects a model name, not a path.
+            # Call vc.get_vc() directly with the absolute path instead,
+            # and register the model in self.rvc.models so infer_file can find the index.
+            abs_model = str(model_path.resolve())
+            abs_index = str(index_path.resolve()) if index_path and index_path.exists() else ""
+            self.rvc.vc.get_vc(abs_model, "v2")
+            model_key = model_path.stem
+            self.rvc.models[model_key] = {"pth": abs_model, "index": abs_index}
+            self.rvc.current_model = model_key
+
             self.model_loaded = True
             self.current_model_path = model_path
             self.current_index_path = index_path
