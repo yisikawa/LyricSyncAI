@@ -11,4 +11,4 @@ export type UploadResult = {
     message: string;
 };
 
-export type Step = 'upload' | 'vocal' | 'transcribe' | 'edit' | 'export';
+export type Step = 'upload' | 'vocal' | 'transcribe' | 'edit' | 'export-original' | 'export-ai';

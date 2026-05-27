@@ -42,16 +42,13 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [originalExport, setOriginalExport] = useState<{ url: string; filename: string } | null>(null);
   const [aiExport, setAiExport] = useState<{ url: string; filename: string } | null>(null);
-  const [exportingVoice, setExportingVoice] = useState<'original' | 'ai' | null>(null);
 
-  // 書き出し完了時に種別ごとに保存
+  // 書き出し完了時にステップに応じて保存
   useEffect(() => {
     if (!exportResult) return;
-    if (exportingVoice === 'original') setOriginalExport({ url: exportResult.url, filename: exportResult.filename });
-    else if (exportingVoice === 'ai') setAiExport({ url: exportResult.url, filename: exportResult.filename });
+    if (activeStep === 'export-original') setOriginalExport({ url: exportResult.url, filename: exportResult.filename });
+    else if (activeStep === 'export-ai') setAiExport({ url: exportResult.url, filename: exportResult.filename });
   }, [exportResult]);
-
-  // activeStepがexport以外になったらリセット不要（結果は保持）
 
   const handleDownload = async (url: string, filename: string) => {
     try {
@@ -113,17 +110,20 @@ function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // APIを直接叩くのではなく、UI上でのタブ切り替えを検知して自動実行
   useEffect(() => {
-    // アクティブステップがvocalで、まだパスがなく、処理中でなければ自動実行
     if (activeStep === 'vocal' && !vocalPath && !isProcessing) {
       handleVocalSeparation();
     }
-    // アクティブステップがtranscribeで、まだセグメントがなく、処理中でなければ自動実行
     if (activeStep === 'transcribe' && segments.length === 0 && !isProcessing) {
       handleTranscribe();
     }
-  }, [activeStep, vocalPath, isProcessing, segments.length]);
+    if (activeStep === 'export-original' && !originalExport && !isProcessing) {
+      handleExport(true);
+    }
+    if (activeStep === 'export-ai' && !aiExport && !isProcessing) {
+      handleExport(false);
+    }
+  }, [activeStep, vocalPath, isProcessing, segments.length, originalExport, aiExport]);
 
   return (
     <div className="min-h-screen w-full bg-gray-950 text-white flex flex-col overflow-x-hidden">
@@ -404,110 +404,85 @@ function App() {
               </motion.div>
             )}
 
-            {/* Step 5: Export */}
-            {activeStep === 'export' && (
-              <motion.div
-                key="export"
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={{ duration: 0.4 }}
-                className="w-full"
-              >
-                <div className="max-w-3xl mx-auto w-full space-y-5">
-
-                  {/* 書き出しボタン 2つ */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      onClick={() => { setExportingVoice('original'); handleExport(true); }}
-                      disabled={isProcessing}
-                      className="relative group flex flex-col items-center justify-center gap-2 py-8 rounded-2xl font-bold text-white transition-all duration-200
-                        bg-gradient-to-br from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700
-                        shadow-[0_0_24px_rgba(59,130,246,0.3)] hover:shadow-[0_0_36px_rgba(59,130,246,0.5)]
-                        disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
-                    >
-                      {isProcessing && exportingVoice === 'original' ? (
-                        <>
-                          <div className="w-7 h-7 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          <span className="text-sm">書き出し中...</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
-                          </svg>
-                          <span className="text-base">字幕動画</span>
-                          {originalExport && <span className="absolute top-3 right-3 text-xs bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full">完了</span>}
-                        </>
-                      )}
-                    </button>
-
-                    <button
-                      onClick={() => { setExportingVoice('ai'); handleExport(false); }}
-                      disabled={isProcessing || !aiCoverPath}
-                      className="relative group flex flex-col items-center justify-center gap-2 py-8 rounded-2xl font-bold text-white transition-all duration-200
-                        bg-gradient-to-br from-violet-600 to-purple-800 hover:from-violet-500 hover:to-purple-700
-                        shadow-[0_0_24px_rgba(139,92,246,0.3)] hover:shadow-[0_0_36px_rgba(139,92,246,0.5)]
-                        disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
-                    >
-                      {isProcessing && exportingVoice === 'ai' ? (
-                        <>
-                          <div className="w-7 h-7 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          <span className="text-sm">書き出し中...</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
-                          </svg>
-                          <span className="text-base">AI 動画</span>
-                          {!aiCoverPath && <span className="text-xs text-purple-300/60 font-normal">AIカバー未生成</span>}
-                          {aiExport && <span className="absolute top-3 right-3 text-xs bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full">完了</span>}
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  {/* プレビュー + 保存バー */}
-                  {exportResult && (
-                    <div className="rounded-2xl overflow-hidden border border-gray-700/60 shadow-2xl bg-black">
-                      <video
-                        src={exportResult.url}
-                        controls
-                        className="w-full h-auto object-contain max-h-[55vh]"
-                        autoPlay
-                      />
-                      <div className="flex items-center gap-3 px-4 py-3 bg-gray-900 border-t border-gray-700/60">
-                        <span className="text-xs text-gray-400 font-mono truncate flex-1">{exportResult.filename}</span>
-                        <button
-                          onClick={() => handleDownload(exportResult.url, exportResult.filename)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm font-medium text-white transition-colors shrink-0"
-                        >
-                          <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z" /><path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" /></svg>
-                          保存
-                        </button>
+            {/* Step 5/6: Export */}
+            {(activeStep === 'export-original' || activeStep === 'export-ai') && (() => {
+              const isOriginal = activeStep === 'export-original';
+              const currentExport = isOriginal ? originalExport : aiExport;
+              const accentFrom = isOriginal ? 'from-blue-600' : 'from-violet-600';
+              const accentTo = isOriginal ? 'to-blue-800' : 'to-purple-800';
+              return (
+                <motion.div
+                  key={activeStep}
+                  variants={pageVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  transition={{ duration: 0.4 }}
+                  className="w-full"
+                >
+                  <div className="max-w-3xl mx-auto w-full space-y-5">
+                    {isProcessing ? (
+                      <div className={`flex flex-col items-center justify-center py-24 gap-5 rounded-3xl bg-gradient-to-br ${accentFrom} ${accentTo} bg-opacity-10`}>
+                        <div className="w-16 h-16 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+                        <p className="font-bold text-lg text-white">
+                          {isOriginal ? '字幕動画を書き出し中...' : 'AI動画を書き出し中...'}
+                        </p>
+                        <p className="text-sm text-white/50">字幕を焼き付けています。しばらくお待ちください</p>
+                      </div>
+                    ) : currentExport ? (
+                      <>
+                        <div className="rounded-2xl overflow-hidden border border-gray-700/60 shadow-2xl bg-black">
+                          <video
+                            src={currentExport.url}
+                            controls
+                            className="w-full h-auto object-contain max-h-[55vh]"
+                            autoPlay
+                          />
+                          <div className="flex items-center gap-3 px-4 py-3 bg-gray-900 border-t border-gray-700/60">
+                            <span className="text-xs text-gray-400 font-mono truncate flex-1">{currentExport.filename}</span>
+                            <button
+                              onClick={() => handleDownload(currentExport.url, currentExport.filename)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-sm font-medium text-white transition-colors shrink-0"
+                            >
+                              <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path d="M10.75 2.75a.75.75 0 0 0-1.5 0v8.614L6.295 8.235a.75.75 0 1 0-1.09 1.03l4.25 4.5a.75.75 0 0 0 1.09 0l4.25-4.5a.75.75 0 0 0-1.09-1.03l-2.955 3.129V2.75Z" /><path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" /></svg>
+                              保存
+                            </button>
+                            <button
+                              onClick={() => {
+                                const a = document.createElement('a');
+                                a.href = currentExport.url;
+                                a.download = currentExport.filename;
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                              }}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 text-sm font-medium text-white transition-colors shrink-0"
+                            >
+                              <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M10 3a.75.75 0 0 1 .75.75v8.19l2.47-2.47a.75.75 0 1 1 1.06 1.06l-3.75 3.75a.75.75 0 0 1-1.06 0L5.72 10.53a.75.75 0 1 1 1.06-1.06l2.47 2.47V3.75A.75.75 0 0 1 10 3Zm-6.25 13a.75.75 0 0 1 .75-.75h11a.75.75 0 0 1 0 1.5h-11a.75.75 0 0 1-.75-.75Z" clipRule="evenodd" /></svg>
+                              DL
+                            </button>
+                          </div>
+                        </div>
                         <button
                           onClick={() => {
-                            const a = document.createElement('a');
-                            a.href = exportResult.url;
-                            a.download = exportResult.filename;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
+                            if (isOriginal) setOriginalExport(null);
+                            else setAiExport(null);
                           }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 text-sm font-medium text-white transition-colors shrink-0"
+                          className="w-full py-2.5 rounded-xl border border-gray-700 hover:border-gray-500 text-sm text-gray-400 hover:text-white transition-colors"
                         >
-                          <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4"><path fillRule="evenodd" d="M10 3a.75.75 0 0 1 .75.75v8.19l2.47-2.47a.75.75 0 1 1 1.06 1.06l-3.75 3.75a.75.75 0 0 1-1.06 0L5.72 10.53a.75.75 0 1 1 1.06-1.06l2.47 2.47V3.75A.75.75 0 0 1 10 3Zm-6.25 13a.75.75 0 0 1 .75-.75h11a.75.75 0 0 1 0 1.5h-11a.75.75 0 0 1-.75-.75Z" clipRule="evenodd" /></svg>
-                          DL
+                          再書き出し
                         </button>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-24 gap-3 text-gray-500">
+                        <div className="w-8 h-8 border-2 border-gray-700 border-t-gray-500 rounded-full animate-spin" />
+                        <p className="text-sm">書き出しを開始しています...</p>
                       </div>
-                    </div>
-                  )}
-
-                </div>
-              </motion.div>
-            )}
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })()}
           </AnimatePresence>
         </div>
       </main >

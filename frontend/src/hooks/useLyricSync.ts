@@ -4,7 +4,7 @@ import type { UploadResponse, ExportResponse } from '../services/api';
 import type { Segment } from '../types';
 import { toast } from 'sonner';
 
-export type Step = 'upload' | 'vocal' | 'transcribe' | 'edit' | 'export';
+export type Step = 'upload' | 'vocal' | 'transcribe' | 'edit' | 'export-original' | 'export-ai';
 
 export const useLyricSync = () => {
     // State
@@ -18,7 +18,6 @@ export const useLyricSync = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [exportResult, setExportResult] = useState<ExportResponse | null>(null);
-    const [useOriginalVoice, setUseOriginalVoice] = useState(false);
 
     const [unlockedSteps, setUnlockedSteps] = useState<Step[]>(['upload']);
 
@@ -105,7 +104,8 @@ export const useLyricSync = () => {
 
             toast.success('文字起こし完了');
             unlockStep('edit');
-            unlockStep('export');
+            unlockStep('export-original');
+            unlockStep('export-ai');
             // setActiveStep('edit'); // Auto-nav disabled
         } catch (err: any) {
             toast.error(`文字起こし失敗: ${err.message}`);
@@ -167,20 +167,12 @@ export const useLyricSync = () => {
         isUploading,
         isProcessing,
         exportResult,
-        useOriginalVoice,
         videoRef,
 
         // Actions
         setSegments,
-        setActiveStep: (step: Step, options?: { ctrlKey: boolean }) => {
+        setActiveStep: (step: Step) => {
             setActiveStep(step);
-            if (step === 'export') {
-                setExportResult(null); // 毎回リセットして再書き出しを可能にする
-                setUseOriginalVoice(!(options?.ctrlKey ?? false));
-            } else if (step === 'edit') {
-                setExportResult(null);
-                setUseOriginalVoice(false);
-            }
         },
         handleFileUpload,
         handleVocalSeparation,

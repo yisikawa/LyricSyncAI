@@ -12,12 +12,13 @@ export const StepNavigation: React.FC<StepNavigationProps> = ({
     onStepChange,
     unlockedSteps
 }) => {
-    const steps: { key: Step; label: string; icon: string }[] = [
-        { key: 'upload', label: '動画選択', icon: '📤' },
-        { key: 'vocal', label: '音声分離', icon: '🎙️' },
-        { key: 'transcribe', label: '文字おこし', icon: '✍️' },
-        { key: 'edit', label: '字幕編集', icon: '✏️' },
-        { key: 'export', label: '動画書き出し', icon: '🎬' }
+    const steps: { key: Step; label: string; icon: string; color: string; borderColor: string; underlineColor: string }[] = [
+        { key: 'upload',          label: '動画選択',   icon: '📤', color: 'rgba(37,99,235,0.2)',   borderColor: 'rgba(59,130,246,0.5)',   underlineColor: '#3b82f6' },
+        { key: 'vocal',           label: '音声分離',   icon: '🎙️', color: 'rgba(37,99,235,0.2)',   borderColor: 'rgba(59,130,246,0.5)',   underlineColor: '#3b82f6' },
+        { key: 'transcribe',      label: '文字おこし', icon: '✍️', color: 'rgba(37,99,235,0.2)',   borderColor: 'rgba(59,130,246,0.5)',   underlineColor: '#3b82f6' },
+        { key: 'edit',            label: '字幕編集',   icon: '✏️', color: 'rgba(37,99,235,0.2)',   borderColor: 'rgba(59,130,246,0.5)',   underlineColor: '#3b82f6' },
+        { key: 'export-original', label: '字幕動画',   icon: '🎬', color: 'rgba(37,99,235,0.2)',   borderColor: 'rgba(59,130,246,0.5)',   underlineColor: '#3b82f6' },
+        { key: 'export-ai',       label: 'AI動画',     icon: '🤖', color: 'rgba(109,40,217,0.2)',  borderColor: 'rgba(139,92,246,0.5)',   underlineColor: '#8b5cf6' },
     ];
 
     return (
@@ -44,7 +45,7 @@ export const StepNavigation: React.FC<StepNavigationProps> = ({
                 return (
                     <div
                         key={step.key}
-                        onClick={(e) => isUnlocked && onStepChange(step.key, { ctrlKey: e.ctrlKey })}
+                        onClick={() => isUnlocked && onStepChange(step.key)}
                         style={{
                             flex: 1,
                             display: 'flex',
@@ -55,8 +56,8 @@ export const StepNavigation: React.FC<StepNavigationProps> = ({
                             borderRadius: '12px',
                             cursor: isUnlocked ? 'pointer' : 'not-allowed',
                             transition: 'all 0.3s ease',
-                            backgroundColor: isActive ? 'rgba(37, 99, 235, 0.2)' : 'transparent',
-                            border: isActive ? '1px solid rgba(59, 130, 246, 0.5)' : '1px solid transparent',
+                            backgroundColor: isActive ? step.color : 'transparent',
+                            border: isActive ? `1px solid ${step.borderColor}` : '1px solid transparent',
                             opacity: isUnlocked ? 1 : 0.3,
                             minWidth: 0,
                             overflow: 'hidden'
@@ -65,7 +66,7 @@ export const StepNavigation: React.FC<StepNavigationProps> = ({
                         <span style={{
                             fontSize: '20px',
                             marginBottom: '4px',
-                            filter: isActive ? 'drop-shadow(0 0 8px rgba(59,130,246,0.6))' : 'none',
+                            filter: isActive ? `drop-shadow(0 0 8px ${step.underlineColor})` : 'none',
                             transform: isActive ? 'scale(1.1)' : 'scale(1)',
                             transition: 'transform 0.3s'
                         }}>
@@ -74,7 +75,7 @@ export const StepNavigation: React.FC<StepNavigationProps> = ({
                         <span style={{
                             fontSize: '10px',
                             fontWeight: '800',
-                            color: isActive ? '#60a5fa' : '#9ca3af',
+                            color: isActive ? step.underlineColor : '#9ca3af',
                             textAlign: 'center',
                             whiteSpace: 'nowrap',
                             overflow: 'hidden',
@@ -87,7 +88,7 @@ export const StepNavigation: React.FC<StepNavigationProps> = ({
                             <div style={{
                                 width: '20px',
                                 height: '2px',
-                                backgroundColor: '#3b82f6',
+                                backgroundColor: step.underlineColor,
                                 marginTop: '4px',
                                 borderRadius: '2px'
                             }} />

@@ -73,12 +73,13 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
     };
 
     return (
-        <div className="relative h-full w-full">
+        <div className="w-full">
             <div
                 ref={scrollContainerRef}
                 onScroll={handleScroll}
                 id="lyric-editor-container"
-                className="absolute inset-0 overflow-y-auto p-4 space-y-2 hide-scrollbar"
+                className="overflow-y-auto p-4 space-y-2 hide-scrollbar"
+                style={{ maxHeight: '60vh' }}
             >
                 {localSegments.map((segment, index) => {
                     const isActive = currentTime >= segment.start && currentTime < segment.end;
@@ -178,7 +179,7 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
                 )}
             </div>
 
-            {/* Scroll Status Indicator - Outside Scroll Container */}
+            {/* Scroll Status Indicator */}
             {isProcessing && userScrolled && (
                 <button
                     onClick={() => {
@@ -187,7 +188,7 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
                             scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' });
                         }
                     }}
-                    className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full shadow-2xl border border-blue-400/50 flex items-center gap-2 animate-in slide-in-from-bottom-4 duration-300"
+                    className="w-full mt-2 bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-2 rounded-full shadow-2xl border border-blue-400/50 flex items-center justify-center gap-2"
                 >
                     <span className="relative flex h-2 w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-100 opacity-75"></span>
