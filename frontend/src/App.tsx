@@ -368,7 +368,7 @@ function App() {
                       <h3 className="text-2xl font-bold mb-2">動画の書き出しが完了しました！</h3>
                       <div className="space-y-6 mt-8">
                         <div className="rounded-2xl overflow-hidden border border-gray-700 shadow-2xl">
-                          <video src={exportResult.url} controls className="w-full" autoPlay />
+                          <video src={exportResult.url} controls className="w-full h-auto object-contain max-h-[70vh] bg-black" autoPlay />
                         </div>
                         <div className="flex gap-4">
                           <button
