@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { FileUpload } from './components/FileUpload';
 import { LyricEditor } from './components/LyricEditor';
 import { VideoPlayer } from './components/VideoPlayer';
@@ -27,7 +26,6 @@ function App() {
     isUploading,
     isProcessing,
     exportResult,
-    useOriginalVoice,
     videoRef,
     setSegments,
     setActiveStep,
@@ -41,6 +39,63 @@ function App() {
 
   // レスポンシブ対応: 画面幅が768px以上なら横並び(horizontal)、それ以外は縦並び(vertical)
   const [layoutDirection, setLayoutDirection] = useState<'horizontal' | 'vertical'>('horizontal');
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [originalExport, setOriginalExport] = useState<{ url: string; filename: string } | null>(null);
+  const [aiExport, setAiExport] = useState<{ url: string; filename: string } | null>(null);
+  const [exportingVoice, setExportingVoice] = useState<'original' | 'ai' | null>(null);
+
+  // 書き出し完了時に種別ごとに保存
+  useEffect(() => {
+    if (!exportResult) return;
+    if (exportingVoice === 'original') setOriginalExport({ url: exportResult.url, filename: exportResult.filename });
+    else if (exportingVoice === 'ai') setAiExport({ url: exportResult.url, filename: exportResult.filename });
+  }, [exportResult]);
+
+  // activeStepがexport以外になったらリセット不要（結果は保持）
+
+  const handleDownload = async (url: string, filename: string) => {
+    try {
+      toast.info('ダウンロード準備中...');
+      const response = await fetch(url);
+      const blob = await response.blob();
+      if ('showSaveFilePicker' in window) {
+        try {
+          const handle = await (window as any).showSaveFilePicker({
+            suggestedName: filename,
+            types: [{ description: 'Video File', accept: { 'video/mp4': ['.mp4'] } }],
+          });
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          toast.success('保存しました');
+          return;
+        } catch (err: any) {
+          if (err.name === 'AbortError') return;
+        }
+      }
+      const objUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(objUrl);
+      document.body.removeChild(a);
+      toast.success('ダウンロードを開始しました');
+    } catch {
+      toast.error('保存中にエラーが発生しました');
+    }
+  };
+
+  useEffect(() => {
+    const v = videoRef.current as HTMLVideoElement | null;
+    if (!v) return;
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => setIsPlaying(false);
+    v.addEventListener('play', onPlay);
+    v.addEventListener('pause', onPause);
+    return () => { v.removeEventListener('play', onPlay); v.removeEventListener('pause', onPause); };
+  }, [videoRef.current]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -68,11 +123,7 @@ function App() {
     if (activeStep === 'transcribe' && segments.length === 0 && !isProcessing) {
       handleTranscribe();
     }
-    // アクティブステップがexportで、まだ結果がなく、処理中でなければ自動実行
-    if (activeStep === 'export' && !exportResult && !isProcessing) {
-      handleExport(useOriginalVoice);
-    }
-  }, [activeStep, vocalPath, isProcessing, segments.length, exportResult, useOriginalVoice]);
+  }, [activeStep, vocalPath, isProcessing, segments.length]);
 
   return (
     <div className="min-h-screen w-full bg-gray-950 text-white flex flex-col overflow-x-hidden">
@@ -295,49 +346,61 @@ function App() {
                 animate="animate"
                 exit="exit"
                 transition={{ duration: 0.4 }}
-                className="w-full"
+                className={`w-full flex gap-4 ${layoutDirection === 'horizontal' ? 'flex-row items-start' : 'flex-col'}`}
               >
-                <PanelGroup orientation={layoutDirection} className="h-full gap-4">
-                  {/* Panel 1: Video Player */}
-                  <Panel defaultSize={75} minSize={20} className="flex flex-col gap-4">
-                    <div className="h-full overflow-y-auto p-2">
-                      <VideoPlayer
-                        uploadResult={uploadResult}
-                        segments={segments}
-                        currentTime={currentTime}
-                        videoRef={videoRef}
-                        onTimeUpdate={handleTimeUpdate}
-                        compact={true}
-                      />
-                      <div className="text-center text-gray-400 text-sm animate-pulse mt-4">
-                        編集が終わったら上部の「書き出し」ボタンを押してください 🎬
+                {/* Video Player */}
+                <div className={layoutDirection === 'horizontal' ? 'flex-[3] min-w-0' : 'w-full'}>
+                  <VideoPlayer
+                    uploadResult={uploadResult}
+                    segments={segments}
+                    currentTime={currentTime}
+                    videoRef={videoRef}
+                    onTimeUpdate={handleTimeUpdate}
+                    compact={true}
+                  />
+                  <div className="text-center text-gray-400 text-sm animate-pulse mt-4">
+                    編集が終わったら上部の「書き出し」ボタンを押してください 🎬
+                  </div>
+                </div>
+
+                {/* Subtitle Editor */}
+                <div className={layoutDirection === 'horizontal' ? 'flex-[1] min-w-0' : 'w-full'}>
+                  <div className="bg-gray-900/40 border border-gray-800 rounded-2xl overflow-hidden flex flex-col">
+                    {/* Header + モバイル用スティッキーコントロール */}
+                    <div className="sticky top-0 z-10 border-b border-gray-800 bg-gray-800/95 backdrop-blur-sm shrink-0">
+                      <div className="p-3 flex items-center justify-between gap-3">
+                        <h3 className="font-bold text-sm uppercase tracking-widest text-gray-400 whitespace-nowrap">Subtitle Editor</h3>
+                        {/* 再生コントロール（モバイルで常時表示） */}
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono text-gray-400">
+                            {Math.floor(currentTime / 60)}:{String(Math.floor(currentTime % 60)).padStart(2, '0')}
+                          </span>
+                          <button
+                            onClick={() => {
+                              const v = videoRef.current as HTMLVideoElement | null;
+                              if (!v) return;
+                              v.paused ? v.play() : v.pause();
+                            }}
+                            className="bg-blue-600 hover:bg-blue-500 text-white rounded-full w-9 h-9 flex items-center justify-center shadow-lg transition-colors"
+                          >
+                            <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                              {isPlaying
+                                ? <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+                                : <path d="M8 5v14l11-7z" />}
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </Panel>
-
-                  {/* Resize Handle */}
-                  <PanelResizeHandle className={`w-2 mx-1 bg-gray-800 hover:bg-blue-500 transition-colors rounded-full flex items-center justify-center cursor-col-resize ${layoutDirection === 'vertical' ? 'h-2 w-full cursor-row-resize my-1' : ''}`}>
-                    <div className="w-1 h-8 bg-gray-600 rounded-full" />
-                  </PanelResizeHandle>
-
-                  {/* Panel 2: Subtitle Editor */}
-                  <Panel defaultSize={25} minSize={15}>
-                    <div className="bg-gray-900/40 border border-gray-800 rounded-2xl overflow-hidden flex flex-col h-full">
-                      <div className="p-4 border-b border-gray-800 bg-gray-800/50 flex justify-between items-center shrink-0">
-                        <h3 className="font-bold text-sm uppercase tracking-widest text-gray-400">Subtitle Editor</h3>
-                      </div>
-                      <div className="flex-1 min-h-0 relative">
-                        <LyricEditor
-                          segments={segments}
-                          onSegmentsChange={setSegments}
-                          currentTime={currentTime}
-                          onSeek={handleSeek}
-                          isProcessing={false}
-                        />
-                      </div>
-                    </div>
-                  </Panel>
-                </PanelGroup>
+                    <LyricEditor
+                      segments={segments}
+                      onSegmentsChange={setSegments}
+                      currentTime={currentTime}
+                      onSeek={handleSeek}
+                      isProcessing={false}
+                    />
+                  </div>
+                </div>
               </motion.div>
             )}
 
@@ -352,87 +415,124 @@ function App() {
                 transition={{ duration: 0.4 }}
                 className="w-full"
               >
-                <div className="max-w-3xl mx-auto w-full p-8 bg-gray-900/50 border border-gray-800 rounded-3xl text-center">
+                <div className="max-w-3xl mx-auto w-full space-y-6">
 
-                  {isProcessing ? (
-                    <div className="py-20 flex flex-col items-center">
-                      <div className="w-16 h-16 border-4 border-green-500/20 border-t-green-500 rounded-full animate-spin mb-6" />
-                      <h3 className="text-2xl font-bold text-white mb-2">
-                        動画を書き出し中... {useOriginalVoice && <span className="text-sm text-yellow-500 ml-2">(元の音声を使用)</span>}
-                      </h3>
-                      <p className="text-green-400 font-medium">字幕を焼き付けています。しばらくお待ちください。</p>
+                  {/* 2-column export options */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                    {/* Column 1: 字幕動画（元の音声） */}
+                    <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-6 flex flex-col gap-3">
+                      <div className="flex items-center gap-3 mb-1">
+                        <span className="text-3xl">🎬</span>
+                        <div>
+                          <h3 className="font-bold text-white text-base">字幕動画</h3>
+                          <p className="text-xs text-gray-400">元の音声を使用</p>
+                        </div>
+                        {originalExport && (
+                          <span className="ml-auto text-xs text-green-400 font-bold">✅ 完了</span>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => { setExportingVoice('original'); handleExport(true); }}
+                        disabled={isProcessing}
+                        className="w-full py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-colors"
+                      >
+                        {isProcessing && exportingVoice === 'original'
+                          ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />書き出し中...</>
+                          : '🎬 書き出す'}
+                      </button>
+
+                      <button
+                        onClick={() => originalExport && handleDownload(originalExport.url, originalExport.filename)}
+                        disabled={!originalExport || isProcessing}
+                        className="w-full py-3 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl font-bold text-white transition-colors"
+                      >
+                        💾 保存する
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (!originalExport) return;
+                          const a = document.createElement('a');
+                          a.href = originalExport.url;
+                          a.download = originalExport.filename;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        }}
+                        disabled={!originalExport || isProcessing}
+                        className="w-full py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl font-bold text-white transition-colors"
+                      >
+                        ⬇️ ダウンロード
+                      </button>
                     </div>
-                  ) : exportResult ? ( // Use local exportResult or check exportedVideoUrl if managed in hook
-                    <>
-                      <div className="text-5xl mb-6">🎉</div>
-                      <h3 className="text-2xl font-bold mb-2">動画の書き出しが完了しました！</h3>
-                      <div className="space-y-6 mt-8">
-                        <div className="rounded-2xl overflow-hidden border border-gray-700 shadow-2xl">
-                          <video src={exportResult.url} controls className="w-full h-auto object-contain max-h-[70vh] bg-black" autoPlay />
+
+                    {/* Column 2: AI動画（AIカバー音声） */}
+                    <div className={`bg-gray-900/50 border rounded-2xl p-6 flex flex-col gap-3 ${aiCoverPath ? 'border-indigo-800/60' : 'border-gray-800'}`}>
+                      <div className="flex items-center gap-3 mb-1">
+                        <span className="text-3xl">🤖</span>
+                        <div>
+                          <h3 className="font-bold text-white text-base">AI動画</h3>
+                          <p className="text-xs text-gray-400">AIカバー音声を使用</p>
                         </div>
-                        <div className="flex gap-4">
-                          <button
-                            onClick={async () => {
-                              if (!exportResult.url || !uploadResult) return;
-                              const filename = exportResult.filename;
-
-                              try {
-                                toast.info('ダウンロード準備中...');
-                                const response = await fetch(exportResult.url);
-                                const blob = await response.blob();
-
-                                if ('showSaveFilePicker' in window) {
-                                  try {
-                                    const handle = await (window as any).showSaveFilePicker({
-                                      suggestedName: filename,
-                                      types: [{
-                                        description: 'Video File',
-                                        accept: { 'video/mp4': ['.mp4'] },
-                                      }],
-                                    });
-                                    const writable = await handle.createWritable();
-                                    await writable.write(blob);
-                                    await writable.close();
-                                    toast.success('保存しました');
-                                    return;
-                                  } catch (err: any) {
-                                    if (err.name === 'AbortError') return;
-                                  }
-                                }
-
-                                const url = window.URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.style.display = 'none';
-                                a.href = url;
-                                a.download = filename;
-                                document.body.appendChild(a);
-                                a.click();
-                                window.URL.revokeObjectURL(url);
-                                document.body.removeChild(a);
-                                toast.success('ダウンロードを開始しました');
-
-                              } catch (error) {
-                                console.error('Save error:', error);
-                                toast.error('保存中にエラーが発生しました');
-                              }
-                            }}
-                            className="flex-1 bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-bold text-center cursor-pointer text-white"
-                          >
-                            動画を保存する 💾
-                          </button>
-                        </div>
+                        {aiExport && (
+                          <span className="ml-auto text-xs text-green-400 font-bold">✅ 完了</span>
+                        )}
                       </div>
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center p-6 bg-green-500/10 rounded-xl border border-green-500/20">
-                      <div className="text-green-400 font-bold mb-2 animate-pulse">
-                        動画書き出しを開始しています...
-                      </div>
-                      <p className="text-sm text-gray-400 text-center">
-                        自動的に処理が開始されます。
-                      </p>
+
+                      <button
+                        onClick={() => { setExportingVoice('ai'); handleExport(false); }}
+                        disabled={isProcessing || !aiCoverPath}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-bold text-white flex items-center justify-center gap-2 transition-colors"
+                      >
+                        {isProcessing && exportingVoice === 'ai'
+                          ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />書き出し中...</>
+                          : '🤖 書き出す'}
+                      </button>
+
+                      <button
+                        onClick={() => aiExport && handleDownload(aiExport.url, aiExport.filename)}
+                        disabled={!aiExport || isProcessing}
+                        className="w-full py-3 bg-emerald-700 hover:bg-emerald-600 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl font-bold text-white transition-colors"
+                      >
+                        💾 保存する
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (!aiExport) return;
+                          const a = document.createElement('a');
+                          a.href = aiExport.url;
+                          a.download = aiExport.filename;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        }}
+                        disabled={!aiExport || isProcessing}
+                        className="w-full py-3 bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed rounded-xl font-bold text-white transition-colors"
+                      >
+                        ⬇️ ダウンロード
+                      </button>
+
+                      {!aiCoverPath && (
+                        <p className="text-xs text-gray-500 text-center pt-1">AIカバーが未生成です</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Video Preview */}
+                  {exportResult && (
+                    <div className="rounded-2xl overflow-hidden border border-gray-700 shadow-2xl">
+                      <video
+                        src={exportResult.url}
+                        controls
+                        className="w-full h-auto object-contain max-h-[60vh] bg-black"
+                        autoPlay
+                      />
                     </div>
                   )}
+
                 </div>
               </motion.div>
             )}
