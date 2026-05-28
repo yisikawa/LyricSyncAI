@@ -186,10 +186,13 @@ def export_video_with_subtitles(video_filename: str, segments: list, use_origina
     if not video_path.exists():
         return None
         
-    # 1. Create SRT file
-    srt_path = video_path.with_suffix(".srt")
-    if not create_srt(segments, srt_path):
-        return None
+    # 1. Create SRT file only when there are segments to write
+    srt_path = None
+    if segments:
+        srt_path = video_path.with_suffix(".srt")
+        if not create_srt(segments, srt_path):
+            print("Warning: SRT creation failed — continuing without subtitles.")
+            srt_path = None
         
     # 2. Burn subtitles
     output_filename = f"exported_{video_filename}"

@@ -61,65 +61,99 @@ def create_srt(segments: list, output_path: Path):
         print(f"Error creating SRT: {e}")
         return False
 
-def burn_subtitles(video_path: Path, srt_path: Path, output_path: Path, audio_path: Path = None):
+def burn_subtitles(video_path: Path, srt_path, output_path: Path, audio_path: Path = None):
     """
-    Burn subtitles into video using FFmpeg.
-    Optionally replace audio track if audio_path is provided.
+    Export video with FFmpeg, optionally burning subtitles and replacing audio.
+    srt_path may be None or an empty file — subtitles are skipped in that case.
+    Falls back to no-subtitle export if subtitle burning fails.
+    Uses explicit stream mapping (-map 0:v:0) to skip embedded cover art.
     """
-    try:
-        import ffmpeg
-        
-        # We need to escape the SRT path for FFmpeg subtitles filter
-        # Especially on Windows where paths contain ":" and "\"
-        # FFmpeg filter paths need careful escaping.
-        # subtitles='C\:/path/to/sub.srt' or similar
-        # Use forward slashes for Windows paths in FFmpeg filters
-        srt_abs_path = str(srt_path.absolute()).replace("\\", "/")
-        
-        print(f"Burning subtitles from {srt_path} into {video_path}")
-        if audio_path:
-             print(f"Replacing audio with: {audio_path}")
+    import subprocess
+    import tempfile
+    import shutil
 
-        # Check if output file exists and try to remove it to check for locks
-        if output_path.exists():
-            try:
-                os.remove(output_path)
-                print(f"Removed existing output file: {output_path}")
-            except PermissionError:
-                print(f"!!! Error: Cannot overwrite {output_path}. The file is likely open in the video player or another program.")
-                # We can't proceed if we can't write
-                return False
-            except Exception as e:
-                print(f"Warning: Could not remove existing file: {e}")
-        
-        # Add subtitles filter - using filename keyword helps with Windows path escaping in ffmpeg-python
-        stream = ffmpeg.input(str(video_path))
-        
+    if audio_path:
+        print(f"Replacing audio with: {audio_path}")
+
+    if output_path.exists():
+        try:
+            os.remove(output_path)
+            print(f"Removed existing output file: {output_path}")
+        except PermissionError:
+            print(f"!!! Error: Cannot overwrite {output_path}. File is locked.")
+            return False
+        except Exception as e:
+            print(f"Warning: Could not remove existing file: {e}")
+
+    has_subtitles = (
+        srt_path is not None
+        and Path(srt_path).exists()
+        and Path(srt_path).stat().st_size > 0
+    )
+
+    temp_srt = None
+
+    def build_cmd(with_subtitles: bool):
+        cmd = [FFMPEG_CMD, '-y', '-i', str(video_path)]
         if audio_path and audio_path.exists():
-            # Use external audio input
-            audio = ffmpeg.input(str(audio_path)).audio
+            cmd += ['-i', str(audio_path)]
+        # Explicit mapping: first video stream only (skips embedded cover art / attached pic)
+        cmd += ['-map', '0:v:0']
+        if audio_path and audio_path.exists():
+            cmd += ['-map', '1:a:0']
         else:
-            # Use original video's audio
-            audio = stream.audio
-            
-        video = stream.video.filter("subtitles", filename=srt_abs_path)
+            cmd += ['-map', '0:a:0']
+        if with_subtitles and temp_srt:
+            srt_abs = str(temp_srt.absolute()).replace("\\", "/")
+            # Escape drive-letter colon for FFmpeg filter string on Windows (e.g. C: -> C\:)
+            if len(srt_abs) >= 2 and srt_abs[1] == ':':
+                srt_abs = srt_abs[0] + '\\:' + srt_abs[2:]
+            cmd += ['-vf', f"subtitles=filename='{srt_abs}'"]
+        cmd += ['-vcodec', 'libx264', '-acodec', 'aac', '-crf', '23', str(output_path)]
+        return cmd
 
-        
-        # Output with high quality
-        # Use aac for audio codec to ensure compatibility when replacing audio
-        out = ffmpeg.output(video, audio, str(output_path), vcodec='libx264', acodec='aac', crf=23)
-        
-        # Run FFmpeg
-        # overwrite_output=True corresponds to -y
-        out.run(cmd=FFMPEG_CMD, overwrite_output=True, capture_stdout=True, capture_stderr=True)
-        
-        print(f"Burned video saved to: {output_path}")
-        return True
+    def run_cmd(cmd):
+        result = subprocess.run(cmd, capture_output=True)
+        if result.returncode != 0:
+            stderr_str = result.stderr.decode('utf-8', errors='replace')
+            print(f"FFmpeg error: {stderr_str}")
+            raise RuntimeError("ffmpeg failed")
+
+    try:
+        if has_subtitles:
+            print(f"Burning subtitles from {srt_path} into {video_path}")
+            # Copy SRT to a temp ASCII-named file to avoid libass non-ASCII path issues on Windows
+            with tempfile.NamedTemporaryFile(suffix='.srt', delete=False) as tf:
+                temp_srt = Path(tf.name)
+            shutil.copy2(srt_path, temp_srt)
+        else:
+            print("No subtitles — exporting video without subtitle filter.")
+
+        try:
+            run_cmd(build_cmd(with_subtitles=has_subtitles))
+            print(f"Exported video saved to: {output_path}")
+            return True
+        except RuntimeError:
+            if has_subtitles:
+                print("Subtitle burning failed — retrying without subtitles...")
+                try:
+                    run_cmd(build_cmd(with_subtitles=False))
+                    print(f"Exported video (without subtitles) saved to: {output_path}")
+                    return True
+                except RuntimeError:
+                    print("Fallback export also failed.")
+            return False
+
     except Exception as e:
-        if hasattr(e, 'stderr'):
-            print(f"FFmpeg error: {e.stderr.decode()}")
-        print(f"Error burning subtitles: {e}")
+        print(f"Error during export: {e}")
         return False
+
+    finally:
+        if temp_srt and temp_srt.exists():
+            try:
+                temp_srt.unlink()
+            except Exception:
+                pass
 
 from faster_whisper import WhisperModel
 
