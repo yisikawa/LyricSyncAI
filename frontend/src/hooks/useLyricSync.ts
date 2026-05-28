@@ -18,6 +18,8 @@ export const useLyricSync = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [exportResult, setExportResult] = useState<ExportResponse | null>(null);
+    const [separationFailed, setSeparationFailed] = useState(false);
+    const [separationError, setSeparationError] = useState<string>('');
 
     const [unlockedSteps, setUnlockedSteps] = useState<Step[]>(['upload']);
 
@@ -32,6 +34,7 @@ export const useLyricSync = () => {
     // Handlers
     const handleFileUpload = async (file: File | null) => {
         if (!file) return;
+        setSeparationFailed(false);
         setIsUploading(true);
         try {
             const result = await api.uploadVideo(file);
@@ -46,16 +49,16 @@ export const useLyricSync = () => {
         }
     };
 
-    const handleVocalSeparation = async () => {
+    const handleVocalSeparation = async (rvcModel?: string, indexFile?: string) => {
         if (!uploadResult) return;
+        setSeparationFailed(false);
+        setSeparationError('');
+        setVocalPath(null);
+        setInstrumentalPath(null);
+        setAiCoverPath(null);
         setIsProcessing(true);
         try {
-            const result = await api.separateAudio(uploadResult.filename);
-            // Assuming result.vocals_url contains the full URL or path we can use
-            // For now, we store the result.vocals_url but usually we need the relative path for transcription
-            // But api.transcribeLive takes filename (relative to uploads)
-            // Actually separateAudio backend returns full URL in vocals_url?
-            // Let's assume we use the original filename for transcription as per backend logic which looks for separated files automatically.
+            const result = await api.separateAudio(uploadResult.filename, rvcModel, indexFile);
             setVocalPath(result.vocals_url);
             if (result.instrumental_url) {
                 setInstrumentalPath(result.instrumental_url);
@@ -69,8 +72,9 @@ export const useLyricSync = () => {
 
             toast.success('ボーカル分離完了');
             unlockStep('transcribe');
-            // setActiveStep('transcribe'); // Auto-nav disabled
         } catch (err: any) {
+            setSeparationFailed(true);
+            setSeparationError(err.message ?? String(err));
             toast.error(`分離失敗: ${err.message}`);
         } finally {
             setIsProcessing(false);
@@ -141,6 +145,14 @@ export const useLyricSync = () => {
         }
     };
 
+    const clearSeparationResults = () => {
+        setVocalPath(null);
+        setInstrumentalPath(null);
+        setAiCoverPath(null);
+        setSeparationFailed(false);
+        setSeparationError('');
+    };
+
     // Video Controls
     const handleTimeUpdate = useCallback(() => {
         if (videoRef.current) {
@@ -166,6 +178,8 @@ export const useLyricSync = () => {
         currentTime,
         isUploading,
         isProcessing,
+        separationFailed,
+        separationError,
         exportResult,
         videoRef,
 
@@ -175,7 +189,8 @@ export const useLyricSync = () => {
             setActiveStep(step);
         },
         handleFileUpload,
-        handleVocalSeparation,
+        handleVocalSeparation: (rvcModel?: string, indexFile?: string) => handleVocalSeparation(rvcModel, indexFile),
+        clearSeparationResults,
         handleSkipSeparation,
         handleTranscribe,
         handleExport,

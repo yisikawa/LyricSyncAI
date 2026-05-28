@@ -14,7 +14,8 @@ from config import (BANNED_PHRASES, DEMUCS_MODEL_NAME, UPLOAD_DIR,
                     WHISPER_MODEL_NAME, WHISPER_SETTINGS, setup_ffmpeg)
 
 # Initialize FFmpeg on module load
-setup_ffmpeg()
+FFMPEG_CMD = setup_ffmpeg()
+LAST_AUDIO_EXTRACTION_ERROR = ""
 
 try:
     from moviepy.video.io.VideoFileClip import VideoFileClip
@@ -110,7 +111,7 @@ def burn_subtitles(video_path: Path, srt_path: Path, output_path: Path, audio_pa
         
         # Run FFmpeg
         # overwrite_output=True corresponds to -y
-        out.run(overwrite_output=True, capture_stdout=True, capture_stderr=True)
+        out.run(cmd=FFMPEG_CMD, overwrite_output=True, capture_stdout=True, capture_stderr=True)
         
         print(f"Burned video saved to: {output_path}")
         return True
@@ -203,16 +204,38 @@ def transcribe_audio(audio_path: Path):
 
 def extract_audio(video_path: Path, output_path: Path):
     """
-    Extract audio from video file using moviepy.
+    Extract audio from video file using ffmpeg-python.
+    moviepy is unreliable with non-ASCII filenames and audio-less streams.
     """
+    global LAST_AUDIO_EXTRACTION_ERROR
+    LAST_AUDIO_EXTRACTION_ERROR = ""
     try:
-        video = VideoFileClip(str(video_path))
-        video.audio.write_audiofile(str(output_path), logger=None)
-        video.close()
+        import ffmpeg as ffmpeg_lib
+        (
+            ffmpeg_lib
+            .input(str(video_path))
+            .audio
+            .output(str(output_path))
+            .overwrite_output()
+            .run(cmd=FFMPEG_CMD, capture_stdout=True, capture_stderr=True)
+        )
         return True
     except Exception as e:
+        stderr = getattr(e, 'stderr', None)
+        if stderr:
+            stderr_text = stderr.decode(errors='replace')
+            print(f"FFmpeg error: {stderr_text}")
+            if "matches no streams" in stderr_text or "Stream map" in stderr_text:
+                LAST_AUDIO_EXTRACTION_ERROR = "動画に音声トラックがありません。音声付きの動画を選択してください。"
+            else:
+                LAST_AUDIO_EXTRACTION_ERROR = stderr_text.splitlines()[-1] if stderr_text.splitlines() else str(e)
+        else:
+            LAST_AUDIO_EXTRACTION_ERROR = str(e)
         print(f"Error extracting audio: {e}")
         return False
+
+def get_last_audio_extraction_error() -> str:
+    return LAST_AUDIO_EXTRACTION_ERROR
 
 def separate_vocals(audio_path: Path, output_dir: Path):
     """
@@ -317,7 +340,7 @@ def mix_audio(vocal_path: Path, inst_path: Path, output_path: Path, vocal_volume
         # Output as MP3 or WAV depending on extension
         out = ffmpeg.output(mixed, str(output_path), audio_bitrate='192k')
         
-        out.run(overwrite_output=True, quiet=True)
+        out.run(cmd=FFMPEG_CMD, overwrite_output=True, quiet=True)
         
         print(f"Mixed audio saved to: {output_path}")
         return True

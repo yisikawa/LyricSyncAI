@@ -82,13 +82,28 @@ def setup_ffmpeg():
         if ffmpeg_bin_dir not in os.environ["PATH"]:
             os.environ["PATH"] = ffmpeg_bin_dir + os.pathsep + os.environ["PATH"]
             print(f"Added {ffmpeg_bin_dir} to PATH")
+        return ffmpeg_path
 
     # Final check
-    if shutil.which("ffmpeg") is None:
+    ffmpeg_exe = shutil.which("ffmpeg")
+    if ffmpeg_exe:
+        print(f"FFmpeg confirmed: {ffmpeg_exe}")
+        return ffmpeg_exe
+
+    try:
+        import imageio_ffmpeg
+        ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+        settings.ffmpeg_path = ffmpeg_exe
+        ffmpeg_bin_dir = str(Path(ffmpeg_exe).parent)
+        if ffmpeg_bin_dir not in os.environ["PATH"]:
+            os.environ["PATH"] = ffmpeg_bin_dir + os.pathsep + os.environ["PATH"]
+        print(f"FFmpeg confirmed via imageio-ffmpeg: {ffmpeg_exe}")
+        return ffmpeg_exe
+    except Exception as e:
         print("!!! Warning: ffmpeg not found in PATH. Video processing will FAIL. !!!")
         print("Please install FFmpeg and set FFMPEG_PATH in .env or ensure it is in your system PATH.")
-    else:
-        print(f"FFmpeg confirmed: {shutil.which('ffmpeg')}")
+        print(f"imageio-ffmpeg fallback failed: {e}")
+        return "ffmpeg"
 
 import json
 

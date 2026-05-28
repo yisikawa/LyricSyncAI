@@ -5,7 +5,7 @@ from config import settings, load_ai_params
 def get_upload_dir() -> Path:
     return settings.upload_dir
 
-def generate_ai_cover(video_path: Path, vocals_path: Path):
+def generate_ai_cover(video_path: Path, vocals_path: Path, model_filename: str = None, index_filename: str = None):
     """
     Generate AI Cover by converting vocals and mixing with instrumental.
     Returns the path to the mixed audio file if successful, otherwise None.
@@ -20,8 +20,8 @@ def generate_ai_cover(video_path: Path, vocals_path: Path):
         params = load_ai_params()
         rvc_params = params.get("rvc", {})
 
-        model_filename = rvc_params.get("model_filename", "model.pth")
-        index_filename = rvc_params.get("index_filename", "model.index")
+        model_filename = model_filename or rvc_params.get("model_filename", "model.pth")
+        index_filename = index_filename or rvc_params.get("index_filename", "model.index")
         
         # Construct full paths using config directory
         model_path = settings.rvc_model_dir / model_filename

@@ -1,13 +1,13 @@
 # Trigger Reload 2
-from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import shutil
 import os
 from pathlib import Path
 
-from services import process_video_background, perform_transcription, get_upload_dir, export_video_with_subtitles
-from schemas import TranscribeRequest, ExportRequest
+from services import perform_transcription, get_upload_dir, export_video_with_subtitles
+from schemas import TranscribeRequest, SeparateRequest, ExportRequest
 
 from config import settings
 
@@ -33,12 +33,19 @@ UPLOAD_DIR = settings.upload_dir
 
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
+@app.get("/models")
+async def list_models():
+    model_dir = settings.rvc_model_dir
+    pth = sorted([f.name for f in model_dir.glob("*.pth")]) if model_dir.exists() else []
+    index = sorted([f.name for f in model_dir.glob("*.index")]) if model_dir.exists() else []
+    return {"pth": pth, "index": index}
+
 @app.get("/")
 def read_root():
     return {"Hello": "World", "app": "LyricSyncAI"}
 
 @app.post("/upload")
-async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def upload_video(file: UploadFile = File(...)):
     if not file.content_type.startswith("video/"):
         raise HTTPException(status_code=400, detail="無効なファイル形式です。動画ファイルをアップロードしてください。")
     
@@ -49,10 +56,7 @@ async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = Fil
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"ファイルの保存に失敗しました: {str(e)}")
     
-    # Schedule background processing
-    background_tasks.add_task(process_video_background, file_path)
-        
-    return {"filename": file.filename, "filepath": str(file_path), "message": "アップロードが完了しました。バックグラウンドで処理を開始します。"}
+    return {"filename": file.filename, "filepath": str(file_path), "message": "アップロードが完了しました。音声分離ステップで処理を開始します。"}
 
 @app.post("/transcribe")
 def transcribe_endpoint(request: TranscribeRequest):
@@ -89,18 +93,19 @@ async def transcribe_live_endpoint(request: TranscribeRequest):
     return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
 @app.post("/separate")
-async def separate_endpoint(request: TranscribeRequest, req: Request):
+async def separate_endpoint(request: SeparateRequest, req: Request):
     video_path = UPLOAD_DIR / request.filename
     if not video_path.exists():
         raise HTTPException(status_code=404, detail="動画ファイルが見つかりません")
         
     audio_path = video_path.with_suffix(".mp3")
     
-    from audio_processor import extract_audio, separate_vocals
+    from audio_processor import extract_audio, get_last_audio_extraction_error, separate_vocals
     
     # 1. Extract Audio
     if not extract_audio(video_path, audio_path):
-        raise HTTPException(status_code=500, detail="音声の抽出に失敗しました")
+        detail = get_last_audio_extraction_error() or "音声の抽出に失敗しました"
+        raise HTTPException(status_code=400, detail=detail)
         
     # 2. Separate Vocals
     vocals_path, no_vocals_path = separate_vocals(audio_path, settings.separated_dir)
@@ -112,7 +117,9 @@ async def separate_endpoint(request: TranscribeRequest, req: Request):
     # or ideally passed explicitly. For now keeping as is since generate_ai_cover was written to find it.)
     
     from services import generate_ai_cover
-    ai_cover_path = generate_ai_cover(video_path, vocals_path)
+    ai_cover_path = generate_ai_cover(video_path, vocals_path,
+                                       model_filename=request.rvc_model,
+                                       index_filename=request.index_file)
     
     base = str(req.base_url).rstrip("/")
     response_data = {

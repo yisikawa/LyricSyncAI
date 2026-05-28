@@ -4,6 +4,7 @@ import { FileUpload } from './components/FileUpload';
 import { LyricEditor } from './components/LyricEditor';
 import { VideoPlayer } from './components/VideoPlayer';
 import { StepNavigation } from './components/StepNavigation';
+import { SettingsPanel } from './components/SettingsPanel';
 import { useLyricSync } from './hooks/useLyricSync';
 import { toast } from 'sonner';
 
@@ -38,12 +39,15 @@ function App() {
     currentTime,
     isUploading,
     isProcessing,
+    separationFailed,
+    separationError,
     exportResult,
     videoRef,
     setSegments,
     setActiveStep,
     handleFileUpload,
     handleVocalSeparation,
+    clearSeparationResults,
     handleTranscribe,
     handleExport,
     handleTimeUpdate,
@@ -54,6 +58,9 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [originalExport, setOriginalExport] = useState<ExportState | null>(null);
   const [aiExport, setAiExport] = useState<ExportState | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [rvcModel, setRvcModel] = useState('n-buna.pth');
+  const [indexFile, setIndexFile] = useState('n-buna_v2.index');
 
   // iOS向け: 書き出し完了後にblobを事前取得しておく
   // これによりボタンタップ時にfetchなしでnavigator.shareを呼べる（ジェスチャー保持）
@@ -178,15 +185,42 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (activeStep === 'vocal' && !vocalPath && !isProcessing) handleVocalSeparation();
+    if (activeStep === 'vocal' && !vocalPath && !isProcessing && !separationFailed) handleVocalSeparation(rvcModel || undefined, indexFile || undefined);
     if (activeStep === 'transcribe' && segments.length === 0 && !isProcessing) handleTranscribe();
     if (activeStep === 'export-original' && !originalExport && !isProcessing) handleExport(true);
     if (activeStep === 'export-ai' && !aiExport && !isProcessing) handleExport(false);
-  }, [activeStep, vocalPath, isProcessing, segments.length, originalExport, aiExport]);
+  }, [activeStep, vocalPath, isProcessing, separationFailed, segments.length, originalExport, aiExport, rvcModel, indexFile]);
 
   return (
     <div className="min-h-screen w-full bg-gray-950 text-white flex flex-col overflow-x-hidden">
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        rvcModel={rvcModel}
+        indexFile={indexFile}
+        onChange={(key, value) => {
+          if (key === 'rvcModel') setRvcModel(value);
+          else setIndexFile(value);
+          clearSeparationResults();
+        }}
+      />
       <main className="flex-1 w-full max-w-7xl mx-auto p-4 flex flex-col relative h-screen">
+        <div className="flex items-center gap-3 mb-3">
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="text-gray-400 hover:text-gray-200 p-2 rounded-lg hover:bg-gray-800 transition-colors text-xl leading-none"
+            aria-label="Voice Settings"
+            title="ボイス設定"
+          >
+            &#9776;
+          </button>
+          {rvcModel && (
+            <span className="text-xs text-gray-500 truncate max-w-[200px]">
+              🎤 {rvcModel}
+            </span>
+          )}
+        </div>
         <StepNavigation
           currentStep={activeStep}
           onStepChange={setActiveStep}
@@ -300,10 +334,25 @@ function App() {
                           これにより、文字起こしの精度が劇的に向上します。
                         </p>
                         {!vocalPath ? (
-                          <div className="flex flex-col items-center justify-center p-6 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                            <div className="text-blue-400 font-bold mb-2 animate-pulse">音声分離を開始しています...</div>
-                            <p className="text-sm text-gray-400 text-center">自動的に処理が開始されます。</p>
-                          </div>
+                          separationFailed ? (
+                            <div className="flex flex-col items-center justify-center p-6 bg-red-500/10 rounded-xl border border-red-500/20 gap-3">
+                              <div className="text-red-400 font-bold">⚠️ 音声分離に失敗しました</div>
+                              {separationError && (
+                                <p className="text-xs text-red-300 font-mono bg-red-900/30 rounded p-2 w-full break-all">{separationError}</p>
+                              )}
+                              <button
+                                onClick={() => handleVocalSeparation(rvcModel || undefined, indexFile || undefined)}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 active:bg-blue-400 text-white text-sm font-medium rounded-lg transition-colors"
+                              >
+                                🔄 再試行
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center p-6 bg-blue-500/10 rounded-xl border border-blue-500/20">
+                              <div className="text-blue-400 font-bold mb-2 animate-pulse">音声分離を開始しています...</div>
+                              <p className="text-sm text-gray-400 text-center">自動的に処理が開始されます。</p>
+                            </div>
+                          )
                         ) : (
                           <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-xl text-green-400 text-sm font-bold flex items-center gap-2">
                             <span>✨ 音声分離が完了しました</span>

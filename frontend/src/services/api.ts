@@ -1,6 +1,6 @@
 import type { Segment } from '../types';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ||
+export const API_BASE_URL = import.meta.env.VITE_API_URL ||
   `${window.location.protocol}//${window.location.hostname}:8001`;
 
 export interface UploadResponse {
@@ -43,11 +43,14 @@ export const api = {
         return await response.json();
     },
 
-    async separateAudio(filename: string): Promise<SeparationResponse> {
+    async separateAudio(filename: string, rvcModel?: string, indexFile?: string): Promise<SeparationResponse> {
+        const body: Record<string, string> = { filename };
+        if (rvcModel) body.rvc_model = rvcModel;
+        if (indexFile) body.index_file = indexFile;
         const response = await fetch(`${API_BASE_URL}/separate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename }),
+            body: JSON.stringify(body),
         });
 
         if (!response.ok) {

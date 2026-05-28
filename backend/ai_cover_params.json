@@ -1,7 +1,7 @@
 {
     "rvc": {
-        "model_filename": "sachiyo-voice.pth",
-        "index_filename": "sachiyo-voice.index",
+        "model_filename": "n-buna.pth",
+        "index_filename": "n-buna_v2.index",
         "pitch_change": 0,
         "f0_method": "rmvpe",
         "index_rate": 0.75

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { UploadResult, Segment } from '../types';
+import { api } from '../services/api';
 
 interface VideoPlayerProps {
     uploadResult?: UploadResult | null;
@@ -25,8 +26,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     React.useEffect(() => {
         let url = '';
         if (uploadResult?.filename) {
-            const apiBase = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:8001`;
-            url = `${apiBase}/uploads/${encodeURIComponent(uploadResult.filename)}`;
+            url = api.getVideoUrl(uploadResult.filename);
         } else if (localFile) {
             url = URL.createObjectURL(localFile);
         }
