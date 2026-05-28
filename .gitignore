@@ -66,5 +66,8 @@ demo*.mp4
 # Environment Variables
 .env
 
+# SSL証明書（秘密鍵をコミットしない）
+certs/
+
 # Backup Models
 backend/model_bkup/
