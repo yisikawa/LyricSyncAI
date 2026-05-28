@@ -18,6 +18,7 @@ export interface SeparationResponse {
 export interface ExportResponse {
     filename: string;
     url: string;
+    download_url?: string;
 }
 
 export const api = {

@@ -60,6 +60,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     src={videoSrc}
                     className="w-full h-auto object-contain max-h-[80vh] bg-black"
                     controls
+                    playsInline
                     onTimeUpdate={onTimeUpdate}
                 />
                 <div className="absolute inset-x-0 bottom-12 flex flex-col items-center justify-end px-4 pointer-events-none z-50 min-h-[4rem]">
@@ -90,6 +91,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     src={videoSrc}
                     className="w-full h-auto object-contain max-h-[70vh] bg-black"
                     controls
+                    playsInline
                     onTimeUpdate={onTimeUpdate}
                 />
 

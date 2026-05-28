@@ -114,13 +114,14 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
                                         }
                                     }}
                                 />
-                                <span
-                                    className="text-xs font-mono text-gray-600 text-center select-none cursor-pointer hover:text-blue-400 transition-colors"
+                                <button
+                                    className="text-xs font-mono text-gray-600 text-center select-none cursor-pointer hover:text-blue-400 transition-colors bg-transparent border-0 p-0"
+                                    style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'transparent' }}
                                     onClick={() => onSeek?.(segment.start)}
                                     title="この時間にシーク"
                                 >
                                     ↓
-                                </span>
+                                </button>
                                 <input
                                     type="number"
                                     step="0.1"
@@ -149,11 +150,15 @@ export const LyricEditor: React.FC<LyricEditorProps> = ({
                                     />
                                 ) : (
                                     <div
+                                        role="button"
+                                        tabIndex={0}
                                         className={`
-                                            p-3 rounded-lg cursor-text min-h-[50px] whitespace-pre-wrap transition-colors
+                                            p-3 rounded-lg cursor-pointer min-h-[50px] whitespace-pre-wrap transition-colors
                                             ${isActive ? 'text-white font-medium' : 'text-gray-300 hover:text-white hover:bg-gray-800'}
                                         `}
+                                        style={{ touchAction: 'manipulation', WebkitTapHighlightColor: 'rgba(59,130,246,0.2)' }}
                                         onClick={() => setEditingId(segment.id)}
+                                        onKeyDown={(e) => e.key === 'Enter' && setEditingId(segment.id)}
                                     >
                                         {segment.text}
                                     </div>

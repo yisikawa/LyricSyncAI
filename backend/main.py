@@ -71,8 +71,9 @@ def transcribe_endpoint(request: TranscribeRequest):
 
     return {"text": result["text"], "segments": result["segments"]}
 
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 import json
+import mimetypes
 from services import perform_transcription_generator
 
 @app.post("/transcribe-live")
@@ -134,5 +135,24 @@ async def export_endpoint(request: ExportRequest, req: Request):
     base = str(req.base_url).rstrip("/")
     return {
         "filename": output_filename,
-        "url": f"{base}/uploads/{output_filename}"
+        "url": f"{base}/uploads/{output_filename}",
+        "download_url": f"{base}/download/{output_filename}"
     }
+
+@app.get("/download/{filename:path}")
+async def download_file(filename: str):
+    upload_root = UPLOAD_DIR.resolve()
+    file_path = (upload_root / filename).resolve()
+
+    if upload_root != file_path and upload_root not in file_path.parents:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    media_type = mimetypes.guess_type(file_path.name)[0] or "application/octet-stream"
+    return FileResponse(
+        path=file_path,
+        filename=file_path.name,
+        media_type=media_type,
+    )
