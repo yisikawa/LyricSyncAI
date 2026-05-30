@@ -59,8 +59,8 @@ function App() {
   const [originalExport, setOriginalExport] = useState<ExportState | null>(null);
   const [aiExport, setAiExport] = useState<ExportState | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [rvcModel, setRvcModel] = useState('n-buna.pth');
-  const [indexFile, setIndexFile] = useState('n-buna_v2.index');
+  const [rvcModel, setRvcModel] = useState(() => localStorage.getItem('rvcModel') ?? 'n-buna.pth');
+  const [indexFile, setIndexFile] = useState(() => localStorage.getItem('indexFile') ?? 'n-buna_v2.index');
 
   // iOS向け: 書き出し完了後にblobを事前取得しておく
   // これによりボタンタップ時にfetchなしでnavigator.shareを呼べる（ジェスチャー保持）
@@ -199,8 +199,13 @@ function App() {
         rvcModel={rvcModel}
         indexFile={indexFile}
         onChange={(key, value) => {
-          if (key === 'rvcModel') setRvcModel(value);
-          else setIndexFile(value);
+          if (key === 'rvcModel') {
+            setRvcModel(value);
+            localStorage.setItem('rvcModel', value);
+          } else {
+            setIndexFile(value);
+            localStorage.setItem('indexFile', value);
+          }
           clearSeparationResults();
         }}
       />

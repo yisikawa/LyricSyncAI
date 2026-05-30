@@ -72,6 +72,8 @@ export const useLyricSync = () => {
 
             toast.success('ボーカル分離完了');
             unlockStep('transcribe');
+            unlockStep('export-original');
+            unlockStep('export-ai');
         } catch (err: any) {
             setSeparationFailed(true);
             setSeparationError(err.message ?? String(err));
