@@ -5,7 +5,7 @@ setlocal
 echo [LyricSyncAI] Starting...
 
 echo [1/2] Starting backend (port 8001, HTTPS)...
-start /b cmd /c "cd /d %~dp0backend && .\venv\Scripts\activate && uvicorn main:app --host 0.0.0.0 --port 8001 --ssl-keyfile %~dp0certs\key.pem --ssl-certfile %~dp0certs\cert.pem"
+start /b cmd /c "cd /d %~dp0backend && call .\venv\Scripts\activate && uvicorn main:app --host 0.0.0.0 --port 8001 --ssl-keyfile %~dp0certs\key.pem --ssl-certfile %~dp0certs\cert.pem"
 
 timeout /t 5 /nobreak > nul
 
