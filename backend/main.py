@@ -2,7 +2,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-import shutil
 import os
 from pathlib import Path
 
@@ -10,6 +9,7 @@ from services import perform_transcription, get_upload_dir, export_video_with_su
 from schemas import TranscribeRequest, SeparateRequest, ExportRequest
 
 from config import settings
+from path_utils import sanitize_filename
 
 app = FastAPI()
 
@@ -44,19 +44,31 @@ async def list_models():
 def read_root():
     return {"Hello": "World", "app": "LyricSyncAI"}
 
+MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024  # 2GB
+
 @app.post("/upload")
-async def upload_video(file: UploadFile = File(...)):
-    if not file.content_type.startswith("video/"):
+def upload_video(file: UploadFile = File(...)):
+    if not file.content_type or not file.content_type.startswith("video/"):
         raise HTTPException(status_code=400, detail="無効なファイル形式です。動画ファイルをアップロードしてください。")
-    
-    file_path = UPLOAD_DIR / file.filename
+
+    safe_name = sanitize_filename(file.filename or "")
+    file_path = UPLOAD_DIR / safe_name
     try:
+        total = 0
         with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            while chunk := file.file.read(1024 * 1024):
+                total += len(chunk)
+                if total > MAX_UPLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail="ファイルサイズが上限（2GB）を超えています")
+                buffer.write(chunk)
+    except HTTPException:
+        file_path.unlink(missing_ok=True)
+        raise
     except Exception as e:
+        file_path.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"ファイルの保存に失敗しました: {str(e)}")
-    
-    return {"filename": file.filename, "filepath": str(file_path), "message": "アップロードが完了しました。音声分離ステップで処理を開始します。"}
+
+    return {"filename": safe_name, "filepath": str(file_path), "message": "アップロードが完了しました。音声分離ステップで処理を開始します。"}
 
 @app.post("/transcribe")
 def transcribe_endpoint(request: TranscribeRequest):
@@ -94,10 +106,14 @@ async def transcribe_live_endpoint(request: TranscribeRequest):
 
 @app.post("/separate")
 async def separate_endpoint(request: SeparateRequest, req: Request):
-    video_path = UPLOAD_DIR / request.filename
+    safe_name = sanitize_filename(request.filename)
+    video_path = UPLOAD_DIR / safe_name
     if not video_path.exists():
         raise HTTPException(status_code=404, detail="動画ファイルが見つかりません")
-        
+
+    rvc_model = sanitize_filename(request.rvc_model) if request.rvc_model else None
+    index_file = sanitize_filename(request.index_file) if request.index_file else None
+
     audio_path = video_path.with_suffix(".mp3")
     
     from audio_processor import extract_audio, get_last_audio_extraction_error, separate_vocals
@@ -118,8 +134,8 @@ async def separate_endpoint(request: SeparateRequest, req: Request):
     
     from services import generate_ai_cover
     ai_cover_path = generate_ai_cover(video_path, vocals_path,
-                                       model_filename=request.rvc_model,
-                                       index_filename=request.index_file)
+                                       model_filename=rvc_model,
+                                       index_filename=index_file)
     
     base = str(req.base_url).rstrip("/")
     response_data = {
@@ -136,7 +152,8 @@ async def separate_endpoint(request: SeparateRequest, req: Request):
 
 @app.post("/export")
 async def export_endpoint(request: ExportRequest, req: Request):
-    output_filename = export_video_with_subtitles(request.video_filename, request.segments, request.use_original_voice)
+    safe_name = sanitize_filename(request.video_filename)
+    output_filename = export_video_with_subtitles(safe_name, request.segments, request.use_original_voice)
 
     if output_filename is None:
         raise HTTPException(status_code=500, detail="動画の書き出しに失敗しました")

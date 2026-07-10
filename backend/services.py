@@ -1,6 +1,7 @@
 from pathlib import Path
 from audio_processor import extract_audio, separate_vocals, transcribe_audio, create_srt, burn_subtitles
 from config import settings, load_ai_params
+from path_utils import is_within
 
 def get_upload_dir() -> Path:
     return settings.upload_dir
@@ -121,7 +122,11 @@ def perform_transcription_generator(filename: str):
             
     # Now filename is either "demo3.mp4" OR "separated/demo3_vocals.wav"
     input_path = settings.upload_dir / filename
-    
+
+    if not is_within(settings.upload_dir, input_path):
+        yield {"error": "無効なファイルパスです"}
+        return
+
     # Logic for finding best audio source:
     # 1. If filename specifically points to a file, use it.
     # 2. If it's a video, check if there's a separated vocal track.

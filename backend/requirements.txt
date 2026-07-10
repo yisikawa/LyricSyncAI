@@ -10,3 +10,4 @@ soundfile
 pydantic-settings
 python-dotenv
 rvc-python
+pytest
