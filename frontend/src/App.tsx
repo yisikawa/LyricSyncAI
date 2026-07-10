@@ -161,19 +161,6 @@ function App() {
   };
 
   useEffect(() => {
-    const v = videoRef.current as HTMLVideoElement | null;
-    if (!v) return;
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
-    v.addEventListener('play', onPlay);
-    v.addEventListener('pause', onPause);
-    return () => {
-      v.removeEventListener('play', onPlay);
-      v.removeEventListener('pause', onPause);
-    };
-  }, [videoRef.current]);
-
-  useEffect(() => {
     const onResize = () => setLayoutDirection(window.innerWidth >= 768 ? 'horizontal' : 'vertical');
     onResize();
     window.addEventListener('resize', onResize);
@@ -261,6 +248,8 @@ function App() {
                           currentTime={currentTime}
                           videoRef={videoRef}
                           onTimeUpdate={handleTimeUpdate}
+                          onPlay={() => setIsPlaying(true)}
+                          onPause={() => setIsPlaying(false)}
                         />
                       </div>
                       <p className="text-green-400 font-medium flex items-center justify-center gap-2">
@@ -435,6 +424,8 @@ function App() {
                     videoRef={videoRef}
                     onTimeUpdate={handleTimeUpdate}
                     compact={true}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
                   />
                   <div className="text-center text-gray-400 text-sm animate-pulse mt-4">
                     編集が終わったら上部の「書き出し」ボタンを押してください 🎬
