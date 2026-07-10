@@ -1,9 +1,7 @@
 from pathlib import Path
-from audio_processor import extract_audio, separate_vocals, transcribe_audio, create_srt, burn_subtitles
+from audio_processor import extract_audio, separate_vocals, create_srt, burn_subtitles
 from config import settings, load_ai_params
-
-def get_upload_dir() -> Path:
-    return settings.upload_dir
+from path_utils import is_within
 
 def generate_ai_cover(video_path: Path, vocals_path: Path, model_filename: str = None, index_filename: str = None):
     """
@@ -79,35 +77,6 @@ def generate_ai_cover(video_path: Path, vocals_path: Path, model_filename: str =
     
     return None
 
-def process_video_background(video_path: Path):
-    """
-    Process uploaded video in background: extract audio and separate vocals.
-    """
-    print(f"Starting processing for: {video_path}")
-    
-    # 1. Extract Audio
-    audio_path = video_path.with_suffix(".mp3")
-    print(f"Extracting audio to: {audio_path}")
-    if extract_audio(video_path, audio_path):
-        print("Audio extraction successful")
-        
-        # 2. Separate Vocals
-        print("Starting vocal separation...")
-        # Output directory for separated tracks
-        separation_out_dir = settings.separated_dir
-        
-        vocals_path, _ = separate_vocals(audio_path, separation_out_dir)
-        if vocals_path:
-             print(f"Vocal separation successful: {vocals_path}")
-             
-             # 3. Voice Conversion (RVC) & Mixing
-             generate_ai_cover(video_path, vocals_path)
-             
-        else:
-             print("Vocal separation failed")
-    else:
-        print("Audio extraction failed")
-
 def perform_transcription_generator(filename: str):
     """
     Perform transcription as a generator. Prioritize separated vocals if available.
@@ -121,7 +90,11 @@ def perform_transcription_generator(filename: str):
             
     # Now filename is either "demo3.mp4" OR "separated/demo3_vocals.wav"
     input_path = settings.upload_dir / filename
-    
+
+    if not is_within(settings.upload_dir, input_path):
+        yield {"error": "無効なファイルパスです"}
+        return
+
     # Logic for finding best audio source:
     # 1. If filename specifically points to a file, use it.
     # 2. If it's a video, check if there's a separated vocal track.
@@ -195,7 +168,8 @@ def export_video_with_subtitles(video_filename: str, segments: list, use_origina
             srt_path = None
         
     # 2. Burn subtitles
-    output_filename = f"exported_{video_filename}"
+    voice_tag = "original" if use_original_voice else "ai"
+    output_filename = f"exported_{voice_tag}_{video_filename}"
     output_path = settings.upload_dir / output_filename
     
     # Check for AI Cover (Vocal only) and Instrumental to create a mixed audio track

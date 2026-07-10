@@ -41,7 +41,6 @@ function App() {
     isProcessing,
     separationFailed,
     separationError,
-    exportResult,
     videoRef,
     setSegments,
     setActiveStep,
@@ -59,8 +58,8 @@ function App() {
   const [originalExport, setOriginalExport] = useState<ExportState | null>(null);
   const [aiExport, setAiExport] = useState<ExportState | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [rvcModel, setRvcModel] = useState(() => localStorage.getItem('rvcModel') ?? 'n-buna.pth');
-  const [indexFile, setIndexFile] = useState(() => localStorage.getItem('indexFile') ?? 'n-buna_v2.index');
+  const [rvcModel, setRvcModel] = useState(() => localStorage.getItem('rvcModel') ?? '');
+  const [indexFile, setIndexFile] = useState(() => localStorage.getItem('indexFile') ?? '');
 
   // iOS向け: 書き出し完了後にblobを事前取得しておく
   // これによりボタンタップ時にfetchなしでnavigator.shareを呼べる（ジェスチャー保持）
@@ -74,21 +73,18 @@ function App() {
       .catch(() => {});
   };
 
-  useEffect(() => {
-    if (!exportResult) return;
+  const runExport = async (isOriginal: boolean) => {
+    const result = await handleExport(isOriginal);
+    if (!result) return;
     const state: ExportState = {
-      url: exportResult.url,
-      filename: exportResult.filename,
-      downloadUrl: exportResult.download_url,
+      url: result.url,
+      filename: result.filename,
+      downloadUrl: result.download_url,
     };
-    if (activeStep === 'export-original') {
-      setOriginalExport(state);
-      prefetchBlob(state.url);
-    } else if (activeStep === 'export-ai') {
-      setAiExport(state);
-      prefetchBlob(state.url);
-    }
-  }, [exportResult]);
+    if (isOriginal) setOriginalExport(state);
+    else setAiExport(state);
+    prefetchBlob(state.url);
+  };
 
   const handleSaveVideo = async (url: string, filename: string, downloadUrl?: string) => {
     const mime = mimeFromFilename(filename);
@@ -165,19 +161,6 @@ function App() {
   };
 
   useEffect(() => {
-    const v = videoRef.current as HTMLVideoElement | null;
-    if (!v) return;
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
-    v.addEventListener('play', onPlay);
-    v.addEventListener('pause', onPause);
-    return () => {
-      v.removeEventListener('play', onPlay);
-      v.removeEventListener('pause', onPause);
-    };
-  }, [videoRef.current]);
-
-  useEffect(() => {
     const onResize = () => setLayoutDirection(window.innerWidth >= 768 ? 'horizontal' : 'vertical');
     onResize();
     window.addEventListener('resize', onResize);
@@ -187,8 +170,8 @@ function App() {
   useEffect(() => {
     if (activeStep === 'vocal' && !vocalPath && !isProcessing && !separationFailed) handleVocalSeparation(rvcModel || undefined, indexFile || undefined);
     if (activeStep === 'transcribe' && segments.length === 0 && !isProcessing) handleTranscribe();
-    if (activeStep === 'export-original' && !originalExport && !isProcessing) handleExport(true);
-    if (activeStep === 'export-ai' && !aiExport && !isProcessing) handleExport(false);
+    if (activeStep === 'export-original' && !originalExport && !isProcessing) runExport(true);
+    if (activeStep === 'export-ai' && !aiExport && !isProcessing) runExport(false);
   }, [activeStep, vocalPath, isProcessing, separationFailed, segments.length, originalExport, aiExport, rvcModel, indexFile]);
 
   return (
@@ -265,6 +248,8 @@ function App() {
                           currentTime={currentTime}
                           videoRef={videoRef}
                           onTimeUpdate={handleTimeUpdate}
+                          onPlay={() => setIsPlaying(true)}
+                          onPause={() => setIsPlaying(false)}
                         />
                       </div>
                       <p className="text-green-400 font-medium flex items-center justify-center gap-2">
@@ -439,6 +424,8 @@ function App() {
                     videoRef={videoRef}
                     onTimeUpdate={handleTimeUpdate}
                     compact={true}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
                   />
                   <div className="text-center text-gray-400 text-sm animate-pulse mt-4">
                     編集が終わったら上部の「書き出し」ボタンを押してください 🎬
@@ -539,7 +526,13 @@ function App() {
                               保存
                             </button>
                             <button
-                              onClick={() => handleSaveVideo(currentExport.url, currentExport.filename, currentExport.downloadUrl)}
+                              onClick={() => {
+                                if (currentExport.downloadUrl) {
+                                  window.location.href = currentExport.downloadUrl;
+                                } else {
+                                  handleSaveVideo(currentExport.url, currentExport.filename, currentExport.downloadUrl);
+                                }
+                              }}
                               style={{ touchAction: 'manipulation' } as React.CSSProperties}
                               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 active:bg-blue-500 text-sm font-medium text-white transition-colors shrink-0"
                             >

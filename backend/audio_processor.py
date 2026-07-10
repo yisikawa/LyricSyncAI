@@ -155,8 +155,6 @@ def burn_subtitles(video_path: Path, srt_path, output_path: Path, audio_path: Pa
             except Exception:
                 pass
 
-from faster_whisper import WhisperModel
-
 class _WhisperModelManager:
     _instance = None
     _model = None
@@ -217,24 +215,6 @@ def transcribe_audio_generator(audio_path: Path):
         import traceback
         traceback.print_exc()
         yield {"error": str(e)}
-
-def transcribe_audio(audio_path: Path):
-    """
-    Transcribe audio using the generator and return results in the original format.
-    (Kept for backward compatibility)
-    """
-    full_result = {
-        "text": "",
-        "segments": []
-    }
-    
-    for segment in transcribe_audio_generator(audio_path):
-        if "error" in segment:
-            return None
-        full_result["segments"].append(segment)
-        full_result["text"] += segment["text"]
-    
-    return full_result
 
 def extract_audio(video_path: Path, output_path: Path):
     """

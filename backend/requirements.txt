@@ -1,12 +1,13 @@
-fastapi
-uvicorn[standard]
-python-multipart
-openai-whisper
-faster-whisper
-demucs
-moviepy
-ffmpeg-python
-soundfile
-pydantic-settings
-python-dotenv
-rvc-python
+﻿fastapi==0.136.1
+uvicorn[standard]==0.47.0
+python-multipart==0.0.29
+faster-whisper==1.2.1
+demucs==4.0.1
+moviepy==2.2.1
+ffmpeg-python==0.2.0
+soundfile==0.13.1
+pydantic-settings==2.14.1
+python-dotenv==1.2.2
+rvc-python==0.1.0
+pytest==9.1.1
+# torch はCUDA構成依存のため手動インストール（現環境: torch==2.11.0+cu126）

@@ -71,3 +71,6 @@ certs/
 
 # Backup Models
 backend/model_bkup/
+
+# Superpowers scratch state
+.superpowers/

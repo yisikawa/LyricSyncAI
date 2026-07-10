@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { api } from '../services/api';
-import type { UploadResponse, ExportResponse } from '../services/api';
+import type { UploadResponse } from '../services/api';
 import type { Segment } from '../types';
 import { toast } from 'sonner';
 
@@ -17,7 +17,6 @@ export const useLyricSync = () => {
     const [currentTime, setCurrentTime] = useState(0);
     const [isUploading, setIsUploading] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [exportResult, setExportResult] = useState<ExportResponse | null>(null);
     const [separationFailed, setSeparationFailed] = useState(false);
     const [separationError, setSeparationError] = useState<string>('');
 
@@ -41,7 +40,7 @@ export const useLyricSync = () => {
             setUploadResult(result);
             toast.success('アップロード完了');
             unlockStep('vocal');
-            // setActiveStep('vocal'); // Auto-navigation disabled per user request
+            // 自動遷移はユーザー要望により無効化
         } catch (err: any) {
             toast.error(`アップロード失敗: ${err.message}`);
         } finally {
@@ -83,15 +82,6 @@ export const useLyricSync = () => {
         }
     };
 
-    const handleSkipSeparation = () => {
-        unlockStep('transcribe');
-        setActiveStep('transcribe'); // Keep manual skip as navigation? Or purely unlock? User said "completed...". Skip is manual action. Assume skip SHOULD navigate? No, user said "separation completed". Skip is bypassing. Let's keep Skip navigating for now or asking. Wait, user instruction "Speech separation completed" -> no transition. "Skip" is functionally completing it. Safe to disable auto-nav for skip too to be consistent. 
-        // Actually, if I click "Skip", I probably want to go to next step immediately because there is no result to look at.
-        // But for consistency with "User wants to control navigation", maybe I should just unlock.
-        // Let's comment it out to be safe and consistent.
-        // setActiveStep('transcribe'); 
-    };
-
     const handleTranscribe = async () => {
         if (!uploadResult) return;
         setIsProcessing(true);
@@ -112,7 +102,7 @@ export const useLyricSync = () => {
             unlockStep('edit');
             unlockStep('export-original');
             unlockStep('export-ai');
-            // setActiveStep('edit'); // Auto-nav disabled
+            // 自動遷移はユーザー要望により無効化
         } catch (err: any) {
             toast.error(`文字起こし失敗: ${err.message}`);
         } finally {
@@ -125,7 +115,6 @@ export const useLyricSync = () => {
         setIsProcessing(true);
         try {
             const result = await api.exportVideo(uploadResult.filename, segments, originalVoiceFlag);
-            setExportResult(result);
             toast.success('書き出し完了');
             return result;
         } catch (err: any) {
@@ -143,7 +132,6 @@ export const useLyricSync = () => {
             setVocalPath(null);
             setSegments([]);
             setCurrentTime(0);
-            setExportResult(null);
         }
     };
 
@@ -182,7 +170,6 @@ export const useLyricSync = () => {
         isProcessing,
         separationFailed,
         separationError,
-        exportResult,
         videoRef,
 
         // Actions
@@ -193,7 +180,6 @@ export const useLyricSync = () => {
         handleFileUpload,
         handleVocalSeparation: (rvcModel?: string, indexFile?: string) => handleVocalSeparation(rvcModel, indexFile),
         clearSeparationResults,
-        handleSkipSeparation,
         handleTranscribe,
         handleExport,
         handleReset,

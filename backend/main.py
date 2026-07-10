@@ -1,29 +1,25 @@
-# Trigger Reload 2
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-import shutil
+from fastapi.responses import FileResponse, StreamingResponse
 import os
+import time
+import json
+import mimetypes
 from pathlib import Path
 
-from services import perform_transcription, get_upload_dir, export_video_with_subtitles
+from services import perform_transcription, perform_transcription_generator, export_video_with_subtitles
 from schemas import TranscribeRequest, SeparateRequest, ExportRequest
 
 from config import settings
+from path_utils import sanitize_filename
 
 app = FastAPI()
 
-# CORS configuration
-origins = [
-    "http://localhost:5150",
-    "https://localhost:5150",
-    "http://192.168.111.10:5150",
-    "https://192.168.111.10:5150",
-]
-
+# CORS: localhost とプライベートIP帯からの :5150 のみ許可
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):5150",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,30 +40,38 @@ async def list_models():
 def read_root():
     return {"Hello": "World", "app": "LyricSyncAI"}
 
+MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024  # 2GB
+
 @app.post("/upload")
-async def upload_video(file: UploadFile = File(...)):
-    if not file.content_type.startswith("video/"):
+def upload_video(file: UploadFile = File(...)):
+    if not file.content_type or not file.content_type.startswith("video/"):
         raise HTTPException(status_code=400, detail="無効なファイル形式です。動画ファイルをアップロードしてください。")
-    
-    file_path = UPLOAD_DIR / file.filename
+
+    safe_name = sanitize_filename(file.filename or "")
+    file_path = UPLOAD_DIR / safe_name
     try:
+        total = 0
         with file_path.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            while chunk := file.file.read(1024 * 1024):
+                total += len(chunk)
+                if total > MAX_UPLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail="ファイルサイズが上限（2GB）を超えています")
+                buffer.write(chunk)
+    except HTTPException:
+        file_path.unlink(missing_ok=True)
+        raise
     except Exception as e:
+        file_path.unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"ファイルの保存に失敗しました: {str(e)}")
-    
-    return {"filename": file.filename, "filepath": str(file_path), "message": "アップロードが完了しました。音声分離ステップで処理を開始します。"}
+
+    return {"filename": safe_name, "filepath": str(file_path), "message": "アップロードが完了しました。音声分離ステップで処理を開始します。"}
 
 @app.post("/transcribe")
 def transcribe_endpoint(request: TranscribeRequest):
     result = perform_transcription(request.filename)
     
     if result is None:
-        # result is None can mean file not found or transcription error.
-        # Ideally services should raise exceptions or return result codes.
-        # For now assuming generic failure if None, but we should check if file exists in services logic.
-        # Actually perform_transcription returns None if file not found OR transcription error (though transcribe_audio returns None on error).
-        # Simpler: Main relies on service. Service returns None -> Error.
+        # services層はエラー時Noneを返す（ファイル未検出/処理エラーの区別なし）
         raise HTTPException(status_code=500, detail="文字起こしに失敗しました（ファイルが見つからないか、処理エラー）")
         
     if result:
@@ -76,11 +80,6 @@ def transcribe_endpoint(request: TranscribeRequest):
             print(f"First segment: {result['segments'][0].get('text')}")
 
     return {"text": result["text"], "segments": result["segments"]}
-
-from fastapi.responses import FileResponse, StreamingResponse
-import json
-import mimetypes
-from services import perform_transcription_generator
 
 @app.post("/transcribe-live")
 async def transcribe_live_endpoint(request: TranscribeRequest):
@@ -93,11 +92,15 @@ async def transcribe_live_endpoint(request: TranscribeRequest):
     return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
 @app.post("/separate")
-async def separate_endpoint(request: SeparateRequest, req: Request):
-    video_path = UPLOAD_DIR / request.filename
+def separate_endpoint(request: SeparateRequest, req: Request):
+    safe_name = sanitize_filename(request.filename)
+    video_path = UPLOAD_DIR / safe_name
     if not video_path.exists():
         raise HTTPException(status_code=404, detail="動画ファイルが見つかりません")
-        
+
+    rvc_model = sanitize_filename(request.rvc_model) if request.rvc_model else None
+    index_file = sanitize_filename(request.index_file) if request.index_file else None
+
     audio_path = video_path.with_suffix(".mp3")
     
     from audio_processor import extract_audio, get_last_audio_extraction_error, separate_vocals
@@ -118,8 +121,8 @@ async def separate_endpoint(request: SeparateRequest, req: Request):
     
     from services import generate_ai_cover
     ai_cover_path = generate_ai_cover(video_path, vocals_path,
-                                       model_filename=request.rvc_model,
-                                       index_filename=request.index_file)
+                                       model_filename=rvc_model,
+                                       index_filename=index_file)
     
     base = str(req.base_url).rstrip("/")
     response_data = {
@@ -135,16 +138,18 @@ async def separate_endpoint(request: SeparateRequest, req: Request):
     return response_data
 
 @app.post("/export")
-async def export_endpoint(request: ExportRequest, req: Request):
-    output_filename = export_video_with_subtitles(request.video_filename, request.segments, request.use_original_voice)
+def export_endpoint(request: ExportRequest, req: Request):
+    safe_name = sanitize_filename(request.video_filename)
+    output_filename = export_video_with_subtitles(safe_name, request.segments, request.use_original_voice)
 
     if output_filename is None:
         raise HTTPException(status_code=500, detail="動画の書き出しに失敗しました")
 
     base = str(req.base_url).rstrip("/")
+    ts = int(time.time())
     return {
         "filename": output_filename,
-        "url": f"{base}/uploads/{output_filename}",
+        "url": f"{base}/uploads/{output_filename}?t={ts}",
         "download_url": f"{base}/download/{output_filename}"
     }
 

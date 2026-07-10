@@ -10,6 +10,8 @@ interface VideoPlayerProps {
     videoRef: React.Ref<HTMLVideoElement>;
     onTimeUpdate: () => void;
     compact?: boolean;
+    onPlay?: () => void;
+    onPause?: () => void;
 }
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({
@@ -19,7 +21,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     currentTime,
     videoRef,
     onTimeUpdate,
-    compact = false
+    compact = false,
+    onPlay,
+    onPause,
 }) => {
     const [videoSrc, setVideoSrc] = React.useState<string>('');
 
@@ -62,6 +66,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     controls
                     playsInline
                     onTimeUpdate={onTimeUpdate}
+                    onPlay={onPlay}
+                    onPause={onPause}
                 />
                 <div className="absolute inset-x-0 bottom-12 flex flex-col items-center justify-end px-4 pointer-events-none z-50 min-h-[4rem]">
                     {segments.map((segment) => {
@@ -93,6 +99,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
                     controls
                     playsInline
                     onTimeUpdate={onTimeUpdate}
+                    onPlay={onPlay}
+                    onPause={onPause}
                 />
 
                 {/* Available Subtitle Overlay */}
