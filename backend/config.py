@@ -3,15 +3,17 @@ import sys
 from pathlib import Path
 from pydantic_settings import BaseSettings
 
+BASE_DIR = Path(__file__).resolve().parent
+
 class Settings(BaseSettings):
-    upload_dir: Path = Path("uploads")
+    upload_dir: Path = BASE_DIR / "uploads"
     whisper_model: str = "medium"
     demucs_model: str = "htdemucs"
     api_port: int = 8001
     ffmpeg_path: str = "ffmpeg"  # Default to 'ffmpeg' in PATH
-    
-    rvc_model_path: Path = Path("models/rvc/model.pth")
-    rvc_index_path: Path = Path("models/rvc/model.index")
+
+    rvc_model_path: Path = BASE_DIR / "models" / "rvc" / "model.pth"
+    rvc_index_path: Path = BASE_DIR / "models" / "rvc" / "model.index"
     rvc_f0_method: str = "rmvpe"
 
     @property
@@ -27,7 +29,7 @@ class Settings(BaseSettings):
         return self.upload_dir / "separated"
     
     model_config = {
-        "env_file": ".env",
+        "env_file": str(BASE_DIR / ".env"),
         "env_file_encoding": "utf-8"
     }
 
@@ -107,7 +109,7 @@ def setup_ffmpeg():
 
 import json
 
-AI_PARAMS_FILE = Path("ai_cover_params.json").absolute()
+AI_PARAMS_FILE = BASE_DIR / "ai_cover_params.json"
 
 def load_ai_params():
     """

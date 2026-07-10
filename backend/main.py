@@ -1,12 +1,14 @@
-# Trigger Reload 2
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, StreamingResponse
 import os
 import time
+import json
+import mimetypes
 from pathlib import Path
 
-from services import perform_transcription, get_upload_dir, export_video_with_subtitles
+from services import perform_transcription, perform_transcription_generator, export_video_with_subtitles
 from schemas import TranscribeRequest, SeparateRequest, ExportRequest
 
 from config import settings
@@ -69,11 +71,7 @@ def transcribe_endpoint(request: TranscribeRequest):
     result = perform_transcription(request.filename)
     
     if result is None:
-        # result is None can mean file not found or transcription error.
-        # Ideally services should raise exceptions or return result codes.
-        # For now assuming generic failure if None, but we should check if file exists in services logic.
-        # Actually perform_transcription returns None if file not found OR transcription error (though transcribe_audio returns None on error).
-        # Simpler: Main relies on service. Service returns None -> Error.
+        # services層はエラー時Noneを返す（ファイル未検出/処理エラーの区別なし）
         raise HTTPException(status_code=500, detail="文字起こしに失敗しました（ファイルが見つからないか、処理エラー）")
         
     if result:
@@ -82,11 +80,6 @@ def transcribe_endpoint(request: TranscribeRequest):
             print(f"First segment: {result['segments'][0].get('text')}")
 
     return {"text": result["text"], "segments": result["segments"]}
-
-from fastapi.responses import FileResponse, StreamingResponse
-import json
-import mimetypes
-from services import perform_transcription_generator
 
 @app.post("/transcribe-live")
 async def transcribe_live_endpoint(request: TranscribeRequest):

@@ -1,10 +1,7 @@
 from pathlib import Path
-from audio_processor import extract_audio, separate_vocals, transcribe_audio, create_srt, burn_subtitles
+from audio_processor import extract_audio, separate_vocals, create_srt, burn_subtitles
 from config import settings, load_ai_params
 from path_utils import is_within
-
-def get_upload_dir() -> Path:
-    return settings.upload_dir
 
 def generate_ai_cover(video_path: Path, vocals_path: Path, model_filename: str = None, index_filename: str = None):
     """
@@ -79,35 +76,6 @@ def generate_ai_cover(video_path: Path, vocals_path: Path, model_filename: str =
         traceback.print_exc()
     
     return None
-
-def process_video_background(video_path: Path):
-    """
-    Process uploaded video in background: extract audio and separate vocals.
-    """
-    print(f"Starting processing for: {video_path}")
-    
-    # 1. Extract Audio
-    audio_path = video_path.with_suffix(".mp3")
-    print(f"Extracting audio to: {audio_path}")
-    if extract_audio(video_path, audio_path):
-        print("Audio extraction successful")
-        
-        # 2. Separate Vocals
-        print("Starting vocal separation...")
-        # Output directory for separated tracks
-        separation_out_dir = settings.separated_dir
-        
-        vocals_path, _ = separate_vocals(audio_path, separation_out_dir)
-        if vocals_path:
-             print(f"Vocal separation successful: {vocals_path}")
-             
-             # 3. Voice Conversion (RVC) & Mixing
-             generate_ai_cover(video_path, vocals_path)
-             
-        else:
-             print("Vocal separation failed")
-    else:
-        print("Audio extraction failed")
 
 def perform_transcription_generator(filename: str):
     """
