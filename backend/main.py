@@ -105,7 +105,7 @@ async def transcribe_live_endpoint(request: TranscribeRequest):
     return StreamingResponse(event_generator(), media_type="application/x-ndjson")
 
 @app.post("/separate")
-async def separate_endpoint(request: SeparateRequest, req: Request):
+def separate_endpoint(request: SeparateRequest, req: Request):
     safe_name = sanitize_filename(request.filename)
     video_path = UPLOAD_DIR / safe_name
     if not video_path.exists():
@@ -151,7 +151,7 @@ async def separate_endpoint(request: SeparateRequest, req: Request):
     return response_data
 
 @app.post("/export")
-async def export_endpoint(request: ExportRequest, req: Request):
+def export_endpoint(request: ExportRequest, req: Request):
     safe_name = sanitize_filename(request.video_filename)
     output_filename = export_video_with_subtitles(safe_name, request.segments, request.use_original_voice)
 
