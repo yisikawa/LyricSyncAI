@@ -41,7 +41,6 @@ function App() {
     isProcessing,
     separationFailed,
     separationError,
-    exportResult,
     videoRef,
     setSegments,
     setActiveStep,
@@ -74,21 +73,18 @@ function App() {
       .catch(() => {});
   };
 
-  useEffect(() => {
-    if (!exportResult) return;
+  const runExport = async (isOriginal: boolean) => {
+    const result = await handleExport(isOriginal);
+    if (!result) return;
     const state: ExportState = {
-      url: exportResult.url,
-      filename: exportResult.filename,
-      downloadUrl: exportResult.download_url,
+      url: result.url,
+      filename: result.filename,
+      downloadUrl: result.download_url,
     };
-    if (activeStep === 'export-original') {
-      setOriginalExport(state);
-      prefetchBlob(state.url);
-    } else if (activeStep === 'export-ai') {
-      setAiExport(state);
-      prefetchBlob(state.url);
-    }
-  }, [exportResult]);
+    if (isOriginal) setOriginalExport(state);
+    else setAiExport(state);
+    prefetchBlob(state.url);
+  };
 
   const handleSaveVideo = async (url: string, filename: string, downloadUrl?: string) => {
     const mime = mimeFromFilename(filename);
@@ -187,8 +183,8 @@ function App() {
   useEffect(() => {
     if (activeStep === 'vocal' && !vocalPath && !isProcessing && !separationFailed) handleVocalSeparation(rvcModel || undefined, indexFile || undefined);
     if (activeStep === 'transcribe' && segments.length === 0 && !isProcessing) handleTranscribe();
-    if (activeStep === 'export-original' && !originalExport && !isProcessing) handleExport(true);
-    if (activeStep === 'export-ai' && !aiExport && !isProcessing) handleExport(false);
+    if (activeStep === 'export-original' && !originalExport && !isProcessing) runExport(true);
+    if (activeStep === 'export-ai' && !aiExport && !isProcessing) runExport(false);
   }, [activeStep, vocalPath, isProcessing, separationFailed, segments.length, originalExport, aiExport, rvcModel, indexFile]);
 
   return (

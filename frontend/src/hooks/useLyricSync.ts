@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { api } from '../services/api';
-import type { UploadResponse, ExportResponse } from '../services/api';
+import type { UploadResponse } from '../services/api';
 import type { Segment } from '../types';
 import { toast } from 'sonner';
 
@@ -17,7 +17,6 @@ export const useLyricSync = () => {
     const [currentTime, setCurrentTime] = useState(0);
     const [isUploading, setIsUploading] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [exportResult, setExportResult] = useState<ExportResponse | null>(null);
     const [separationFailed, setSeparationFailed] = useState(false);
     const [separationError, setSeparationError] = useState<string>('');
 
@@ -125,7 +124,6 @@ export const useLyricSync = () => {
         setIsProcessing(true);
         try {
             const result = await api.exportVideo(uploadResult.filename, segments, originalVoiceFlag);
-            setExportResult(result);
             toast.success('書き出し完了');
             return result;
         } catch (err: any) {
@@ -143,7 +141,6 @@ export const useLyricSync = () => {
             setVocalPath(null);
             setSegments([]);
             setCurrentTime(0);
-            setExportResult(null);
         }
     };
 
@@ -182,7 +179,6 @@ export const useLyricSync = () => {
         isProcessing,
         separationFailed,
         separationError,
-        exportResult,
         videoRef,
 
         // Actions
