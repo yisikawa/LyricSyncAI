@@ -58,8 +58,8 @@ function App() {
   const [originalExport, setOriginalExport] = useState<ExportState | null>(null);
   const [aiExport, setAiExport] = useState<ExportState | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [rvcModel, setRvcModel] = useState(() => localStorage.getItem('rvcModel') ?? 'n-buna.pth');
-  const [indexFile, setIndexFile] = useState(() => localStorage.getItem('indexFile') ?? 'n-buna_v2.index');
+  const [rvcModel, setRvcModel] = useState(() => localStorage.getItem('rvcModel') ?? '');
+  const [indexFile, setIndexFile] = useState(() => localStorage.getItem('indexFile') ?? '');
 
   // iOS向け: 書き出し完了後にblobを事前取得しておく
   // これによりボタンタップ時にfetchなしでnavigator.shareを呼べる（ジェスチャー保持）
@@ -526,7 +526,13 @@ function App() {
                               保存
                             </button>
                             <button
-                              onClick={() => handleSaveVideo(currentExport.url, currentExport.filename, currentExport.downloadUrl)}
+                              onClick={() => {
+                                if (currentExport.downloadUrl) {
+                                  window.location.href = currentExport.downloadUrl;
+                                } else {
+                                  handleSaveVideo(currentExport.url, currentExport.filename, currentExport.downloadUrl);
+                                }
+                              }}
                               style={{ touchAction: 'manipulation' } as React.CSSProperties}
                               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-700 hover:bg-blue-600 active:bg-blue-500 text-sm font-medium text-white transition-colors shrink-0"
                             >
