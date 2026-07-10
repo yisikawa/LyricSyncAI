@@ -3,6 +3,7 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import os
+import time
 from pathlib import Path
 
 from services import perform_transcription, get_upload_dir, export_video_with_subtitles
@@ -159,9 +160,10 @@ def export_endpoint(request: ExportRequest, req: Request):
         raise HTTPException(status_code=500, detail="動画の書き出しに失敗しました")
 
     base = str(req.base_url).rstrip("/")
+    ts = int(time.time())
     return {
         "filename": output_filename,
-        "url": f"{base}/uploads/{output_filename}",
+        "url": f"{base}/uploads/{output_filename}?t={ts}",
         "download_url": f"{base}/download/{output_filename}"
     }
 

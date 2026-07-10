@@ -200,7 +200,8 @@ def export_video_with_subtitles(video_filename: str, segments: list, use_origina
             srt_path = None
         
     # 2. Burn subtitles
-    output_filename = f"exported_{video_filename}"
+    voice_tag = "original" if use_original_voice else "ai"
+    output_filename = f"exported_{voice_tag}_{video_filename}"
     output_path = settings.upload_dir / output_filename
     
     # Check for AI Cover (Vocal only) and Instrumental to create a mixed audio track
