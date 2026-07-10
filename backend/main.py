@@ -14,17 +14,10 @@ from path_utils import sanitize_filename
 
 app = FastAPI()
 
-# CORS configuration
-origins = [
-    "http://localhost:5150",
-    "https://localhost:5150",
-    "http://192.168.111.10:5150",
-    "https://192.168.111.10:5150",
-]
-
+# CORS: localhost とプライベートIP帯からの :5150 のみ許可
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}):5150",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

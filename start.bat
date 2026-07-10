@@ -2,6 +2,8 @@
 chcp 65001 > nul
 setlocal
 
+set LAN_IP=192.168.111.10
+
 echo [LyricSyncAI] Starting...
 
 echo [1/2] Starting backend (port 8001, HTTPS)...
@@ -11,9 +13,9 @@ timeout /t 5 /nobreak > nul
 
 echo.
 echo [2/2] Starting frontend (HTTPS)...
-echo Press Ctrl+C to stop all services.
+echo Ctrl+C stops the frontend only. Run stop.bat to stop all services.
 echo.
-echo iOS access: https://192.168.111.10:5150
+echo iOS access: https://%LAN_IP%:5150
 echo.
 
 cd /d %~dp0frontend
